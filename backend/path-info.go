@@ -2,7 +2,7 @@ package backend
 
 import (
 	"context"
-	"github.com/Shuttl-Tech/vault-plugin-postgres-cluster/version"
+	"github.com/Shuttl-Tech/vault-plugin-postgres/version"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 )
