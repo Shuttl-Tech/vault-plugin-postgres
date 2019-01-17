@@ -14,11 +14,11 @@ func TestCloneUpdate(t *testing.T) {
 	var (
 		testCloneSourceCluster = "test-clone-source"
 		testCloneTargetCluster = "test-clone-target"
-		testCloneDb = "test-clone-db"
+		testCloneDb            = "test-clone-db"
 	)
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/"+testCloneSourceCluster, attrs, false),
 			testAccWriteDbConfig(t, "cluster/"+testCloneSourceCluster+"/"+testCloneDb),
@@ -30,12 +30,12 @@ func TestCloneUpdate(t *testing.T) {
 func testAccCloneCluster(t *testing.T, attrs map[string]interface{}, sourceName, targetName string) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.UpdateOperation,
-		Path: "clone/"+sourceName,
-		ErrorOk: false,
+		Path:      "clone/" + sourceName,
+		ErrorOk:   false,
 		Data: map[string]interface{}{
 			"target": targetName,
-			"host": attrs["host"].(string),
-			"port": attrs["port"].(int),
+			"host":   attrs["host"].(string),
+			"port":   attrs["port"].(int),
 		},
 		Check: func(resp *logical.Response) error {
 			for _, w := range resp.Warnings {

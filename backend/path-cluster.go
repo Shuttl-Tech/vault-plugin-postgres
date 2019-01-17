@@ -241,7 +241,9 @@ func (b *backend) pathClusterUpdate(ctx context.Context, req *logical.Request, d
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mgmtRole, mgmtPass, err := createManagementRole(ctx, db, clusterName)
 	if err != nil {

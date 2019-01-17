@@ -67,9 +67,9 @@ func TestAccCredsCreate(t *testing.T) {
 		t.Errorf("failed to store cluster entry in test storage: %s", err)
 	}
 
-	hijackT := &T{T:t}
+	hijackT := &T{T: t}
 	logicaltest.Test(hijackT, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, path.Join("cluster", testCluster), clusterAttr, false),
 			testAccReadClusterConfigVar(t, path.Join("cluster", testCluster), cluster),
@@ -85,8 +85,8 @@ func TestAccCredsCreate(t *testing.T) {
 func testAccReadCreds(t *T, cluster *ClusterConfig, backend logical.Backend, storage logical.Storage) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.ReadOperation,
-		Path: path.Join("creds", testCluster, testDb, testRole),
-		ErrorOk: false,
+		Path:      path.Join("creds", testCluster, testDb, testRole),
+		ErrorOk:   false,
 		Check: logicaltest.TestCheckMulti(
 			testAccCheckCreds(cluster),
 			testAccCheckRenewCreds(t, cluster, backend, storage),
@@ -169,7 +169,7 @@ func testAccCheckRenewCreds(t *T, cluster *ClusterConfig, backend logical.Backen
 		// Lease has a maximum precision of one second,
 		// this will make sure we don't end up renewing the
 		// creds on same second as the initial creation time.
-		time.Sleep(2*time.Second)
+		time.Sleep(2 * time.Second)
 
 		renResp, err := backend.HandleRequest(context.Background(), &logical.Request{
 			Operation: logical.RenewOperation,
@@ -280,7 +280,7 @@ func testAccReadDbConfigCopy(t *testing.T, name string, storage logical.Storage)
 		Path:      name,
 		ErrorOk:   false,
 		Check: func(resp *logical.Response) error {
-            dbc := &DbConfig{}
+			dbc := &DbConfig{}
 			err := mapstructure.Decode(resp.Data, dbc)
 			if err != nil {
 				return fmt.Errorf("failed to decode database configuration. %s", err)

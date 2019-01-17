@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/Shuttl-Tech/vault-plugin-postgres-cluster/backend"
+	"github.com/Shuttl-Tech/vault-plugin-postgres/backend"
 	"github.com/hashicorp/vault/helper/pluginutil"
 	"github.com/hashicorp/vault/logical/plugin"
 	"log"
@@ -25,4 +25,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-

@@ -124,15 +124,15 @@ endif
 .PHONY: dist
 
 # test runs the test suite.
-test:
+test: fmtcheck errcheck
 	@echo "==> Testing ${NAME}"
-	@go test -timeout=30s -parallel=20 -tags="${GOTAGS}" ${GOFILES} ${TESTARGS}
+	@go test -v -timeout=300s -parallel=20 -tags="${GOTAGS}" ${GOFILES} ${TESTARGS}
 .PHONY: test
 
 # test-race runs the test suite.
-test-race:
+test-race: fmtcheck errcheck
 	@echo "==> Testing ${NAME} (race)"
-	@go test -timeout=60s -race -tags="${GOTAGS}" ${GOFILES} ${TESTARGS}
+	@go test -v -timeout=300s -race -tags="${GOTAGS}" ${GOFILES} ${TESTARGS}
 .PHONY: test-race
 
 # _cleanup removes any previous binaries
@@ -196,4 +196,15 @@ _sign:
 
 fmt:
 	@echo "==> Fixing source code with gofmt..."
-	gofmt -s -w ./backend ./version
+	gofmt -s -w ./backend ./version ./main.go
+
+buildall: darwin/386 darwin/amd64 freebsd/386 freebsd/amd64 freebsd/arm linux/386 linux/amd64 linux/arm windows/386 windows/amd64
+.PHONY: all
+
+fmtcheck:
+	@sh -c "'$(CURDIR)/scripts/fmtcheck.sh'"
+.PHONY: fmtcheck
+
+errcheck:
+	@sh -c "'$(CURDIR)/scripts/errcheck.sh'"
+.PHONY: errcheck

@@ -10,7 +10,7 @@ import (
 func TestInfoRead(t *testing.T) {
 	backend := testGetBackend(t)
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			{
 				Operation: logical.ReadOperation,
