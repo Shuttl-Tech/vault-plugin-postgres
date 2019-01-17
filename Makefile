@@ -29,9 +29,9 @@ GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 
 # Default os-arch combination to build
-XC_OS ?= darwin freebsd linux netbsd openbsd solaris windows
+XC_OS ?= darwin linux windows
 XC_ARCH ?= 386 amd64 arm
-XC_EXCLUDE ?= darwin/arm solaris/386 solaris/arm windows/arm
+XC_EXCLUDE ?= darwin/arm windows/arm
 
 # GPG Signing key (blank by default, means no GPG signing)
 GPG_KEY ?=
@@ -68,7 +68,7 @@ define make-xc-target
 				GOARCH="${2}" \
 				go build \
 				  -a \
-					-o="pkg/${1}_${2}/${NAME}${3}" \
+					-o="pkg/${NAME}${3}_${1}_${2}" \
 					-ldflags "${LD_FLAGS}" \
 					-tags "${GOTAGS}"
   endif
@@ -119,7 +119,7 @@ ifndef GPG_KEY
 else
 	@$(MAKE) -f "${MKFILE_PATH}" _cleanup
 	@$(MAKE) -f "${MKFILE_PATH}" -j4 build
-	@$(MAKE) -f "${MKFILE_PATH}" _compress _checksum _sign
+	@$(MAKE) -f "${MKFILE_PATH}" _checksum _sign
 endif
 .PHONY: dist
 
@@ -140,30 +140,10 @@ _cleanup:
 	@rm -rf "${CURRENT_DIR}/pkg/"
 	@rm -rf "${CURRENT_DIR}/bin/"
 
-# _compress compresses all the binaries in pkg/* as tarball and zip.
-_compress:
-	@mkdir -p "${CURRENT_DIR}/pkg/dist"
-	@for platform in $$(find ./pkg -mindepth 1 -maxdepth 1 -type d); do \
-		osarch=$$(basename "$$platform"); \
-		if [ "$$osarch" = "dist" ]; then \
-			continue; \
-		fi; \
-		\
-		ext=""; \
-		if test -z "$${osarch##*windows*}"; then \
-			ext=".exe"; \
-		fi; \
-		cd "$$platform"; \
-		tar -czf "${CURRENT_DIR}/pkg/dist/${NAME}_${VERSION}_$${osarch}.tgz" "${NAME}$${ext}"; \
-		zip -q "${CURRENT_DIR}/pkg/dist/${NAME}_${VERSION}_$${osarch}.zip" "${NAME}$${ext}"; \
-		cd - &>/dev/null; \
-	done
-.PHONY: _compress
-
-# _checksum produces the checksums for the binaries in pkg/dist
+# _checksum produces the checksums for the binaries in pkg
 _checksum:
-	@cd "${CURRENT_DIR}/pkg/dist" && \
-		shasum --algorithm 256 * > ${CURRENT_DIR}/pkg/dist/${NAME}_${VERSION}_SHA256SUMS && \
+	@cd "${CURRENT_DIR}/pkg" && \
+		shasum --algorithm 256 * > ${CURRENT_DIR}/pkg/${NAME}_${VERSION}_SHA256SUMS && \
 		cd - &>/dev/null
 .PHONY: _checksum
 
@@ -173,7 +153,7 @@ _sign:
 	@echo "==> Signing ${PROJECT} at v${VERSION}"
 	@gpg \
 		--default-key "${GPG_KEY}" \
-		--detach-sig "${CURRENT_DIR}/pkg/dist/${NAME}_${VERSION}_SHA256SUMS"
+		--detach-sig "${CURRENT_DIR}/pkg/${NAME}_${VERSION}_SHA256SUMS"
 	@git commit \
 		--allow-empty \
 		--gpg-sign="${GPG_KEY}" \
