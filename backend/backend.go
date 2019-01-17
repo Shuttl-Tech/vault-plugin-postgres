@@ -85,7 +85,7 @@ func New(c *logical.BackendConfig) *backend {
 				Callbacks: map[logical.Operation]framework.OperationFunc{
 					logical.ReadOperation: b.pathInfo,
 				},
-				HelpSynopsis: helpSynopsisInfo,
+				HelpSynopsis:    helpSynopsisInfo,
 				HelpDescription: helpDescriptionInfo,
 			},
 			{
@@ -143,39 +143,39 @@ func New(c *logical.BackendConfig) *backend {
 					logical.UpdateOperation: b.pathClusterUpdate,
 					logical.DeleteOperation: b.pathClusterDelete,
 				},
-				HelpSynopsis: helpSynopsisCluster,
+				HelpSynopsis:    helpSynopsisCluster,
 				HelpDescription: helpDescriptionCluster,
 			},
 			{
-				Pattern: "clone/"+framework.GenericNameRegex("cluster"),
+				Pattern: "clone/" + framework.GenericNameRegex("cluster"),
 				Fields: map[string]*framework.FieldSchema{
 					"cluster": {
-						Type: framework.TypeString,
+						Type:        framework.TypeString,
 						Description: "Identifier of the source cluster to clone",
 					},
 					"target": {
-						Type: framework.TypeString,
+						Type:        framework.TypeString,
 						Description: "Identifier for the target cluster",
 					},
 					"host": {
-						Type: framework.TypeString,
+						Type:        framework.TypeString,
 						Description: "Host name of the target cluster",
 					},
 					"port": {
-						Type: framework.TypeInt,
-						Default: 5432,
+						Type:        framework.TypeInt,
+						Default:     5432,
 						Description: "Port number of the target cluster",
 					},
 					"inherit_deleted_db": {
-						Type: framework.TypeBool,
-						Default: false,
+						Type:        framework.TypeBool,
+						Default:     false,
 						Description: "If set to true the clone will inherit the configuration for deleted databases as well",
 					},
 				},
 				Callbacks: map[logical.Operation]framework.OperationFunc{
 					logical.UpdateOperation: b.pathCloneUpdate,
 				},
-				HelpSynopsis: helpSynopsisClone,
+				HelpSynopsis:    helpSynopsisClone,
 				HelpDescription: helpDescriptionClone,
 			},
 			{
@@ -195,7 +195,7 @@ func New(c *logical.BackendConfig) *backend {
 					logical.UpdateOperation: b.pathDatabaseUpdate,
 					logical.DeleteOperation: b.pathDatabaseDelete,
 				},
-				HelpSynopsis: helpSynopsisDatabase,
+				HelpSynopsis:    helpSynopsisDatabase,
 				HelpDescription: helpDescriptionDatabase,
 			},
 			{
@@ -203,7 +203,7 @@ func New(c *logical.BackendConfig) *backend {
 				Callbacks: map[logical.Operation]framework.OperationFunc{
 					logical.ListOperation: b.pathRoleList,
 				},
-				HelpSynopsis: helpSynopsisListRoles,
+				HelpSynopsis:    helpSynopsisListRoles,
 				HelpDescription: helpDescriptionListRoles,
 			},
 			{
@@ -239,7 +239,7 @@ func New(c *logical.BackendConfig) *backend {
 					logical.ReadOperation:   b.pathRoleRead,
 					logical.DeleteOperation: b.pathRoleDelete,
 				},
-				HelpSynopsis: helpSynopsisRoles,
+				HelpSynopsis:    helpSynopsisRoles,
 				HelpDescription: helpDescriptionRoles,
 			},
 			{
@@ -261,7 +261,7 @@ func New(c *logical.BackendConfig) *backend {
 				Callbacks: map[logical.Operation]framework.OperationFunc{
 					logical.ReadOperation: b.secretCredsCreate,
 				},
-				HelpSynopsis: helpSynopsisCreds,
+				HelpSynopsis:    helpSynopsisCreds,
 				HelpDescription: helpDescriptionCreds,
 			},
 		},

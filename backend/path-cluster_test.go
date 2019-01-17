@@ -29,7 +29,7 @@ func TestBackend_cluster_basic(t *testing.T) {
 	}
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/test-acc-cluster", attr, false),
 			testAccReadClusterConfig(t, "cluster/test-acc-cluster", expectAttr, expectKeys, false),
@@ -52,7 +52,7 @@ func TestBackend_cluster_init(t *testing.T) {
 	defer cleanup()
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/test-acc-init", attr, false),
 			testAccValidateClusterInit(t, "cluster/test-acc-init"),

@@ -14,7 +14,7 @@ func (b *backend) pathCloneUpdate(ctx context.Context, req *logical.Request, dat
 	}
 
 	targetPort := data.Get("port").(int)
-	if targetPort <1 || targetPort > 65535 {
+	if targetPort < 1 || targetPort > 65535 {
 		return logical.ErrorResponse(fmt.Sprintf("Invalid port number %d, a valid port number between 1 and 65535 is required", targetPort)), nil
 	}
 

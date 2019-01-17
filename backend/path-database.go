@@ -130,7 +130,9 @@ func (b *backend) pathDatabaseUpdate(ctx context.Context, req *logical.Request, 
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	qSetupRole := []string{queryCreateObjectsOwnerRole, queryGrantAll}
 	for _, q := range qSetupRole {

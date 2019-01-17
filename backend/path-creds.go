@@ -98,7 +98,9 @@ func (b *backend) secretCredsCreate(ctx context.Context, req *logical.Request, d
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	m := map[string]string{
 		"user":          pq.QuoteIdentifier(username),
@@ -217,7 +219,7 @@ func (b *backend) secretCredsRenew(ctx context.Context, req *logical.Request, da
 	}
 
 	resp := &logical.Response{
-		Secret: req.Secret,
+		Secret:   req.Secret,
 		Warnings: warnings,
 	}
 
@@ -297,7 +299,9 @@ func (b *backend) secretCredsRevoke(ctx context.Context, req *logical.Request, d
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	for idx, query := range revocationSQL {
 		query := strings.TrimSpace(query)
