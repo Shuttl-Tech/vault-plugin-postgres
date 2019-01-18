@@ -20,3 +20,4 @@
 # Local development tmp
 /tmp/
 .idea
+.DS_Store

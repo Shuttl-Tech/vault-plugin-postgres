@@ -189,6 +189,15 @@ func New(c *logical.BackendConfig) *backend {
 						Type:        framework.TypeString,
 						Description: "Name of the new database to create",
 					},
+					"objects_owner_role": {
+						Type:        framework.TypeString,
+						Description: "Role that will own all objects in this database",
+					},
+					"initialize": {
+						Type:        framework.TypeBool,
+						Description: "If true vault will create the database and necessary roles in cluster",
+						Default:     true,
+					},
 				},
 				Callbacks: map[logical.Operation]framework.OperationFunc{
 					logical.ReadOperation:   b.pathDatabaseRead,
