@@ -11,29 +11,22 @@ import (
 	log "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/api"
 	bplugin "github.com/hashicorp/vault/builtin/plugin"
-	"github.com/hashicorp/vault/helper/consts"
 	"github.com/hashicorp/vault/helper/pluginutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/plugin"
 	"github.com/hashicorp/vault/logical/plugin/mock"
-	"github.com/hashicorp/vault/physical"
 	"github.com/hashicorp/vault/physical/inmem"
 	"github.com/hashicorp/vault/vault"
 )
 
 func getPluginClusterAndCore(t testing.TB, logger log.Logger) (*vault.TestCluster, *vault.TestClusterCore) {
-	inm, err := inmem.NewTransactionalInmem(nil, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
 	inmha, err := inmem.NewInmemHA(nil, logger)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	coreConfig := &vault.CoreConfig{
-		Physical:   inm,
-		HAPhysical: inmha.(physical.HABackend),
+		Physical: inmha,
 		LogicalBackends: map[string]logical.Factory{
 			"plugin": bplugin.Factory,
 		},
@@ -51,11 +44,12 @@ func getPluginClusterAndCore(t testing.TB, logger log.Logger) (*vault.TestCluste
 	os.Setenv(pluginutil.PluginCACertPEMEnv, cluster.CACertPEMFile)
 
 	vault.TestWaitActive(t, core.Core)
-	vault.TestAddTestPlugin(t, core.Core, "mock-plugin", consts.PluginTypeSecrets, "TestPlugin_PluginMain", []string{}, "")
+	vault.TestAddTestPlugin(t, core.Core, "mock-plugin", "TestPlugin_PluginMain")
 
 	// Mount the mock plugin
 	err = core.Client.Sys().Mount("mock", &api.MountInput{
-		Type: "mock-plugin",
+		Type:       "plugin",
+		PluginName: "mock-plugin",
 	})
 	if err != nil {
 		t.Fatal(err)

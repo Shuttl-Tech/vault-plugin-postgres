@@ -283,7 +283,6 @@ func TestBarrierView_ClearView(t *testing.T) {
 		t.Fatalf("have keys: %#v", out)
 	}
 }
-
 func TestBarrierView_Readonly(t *testing.T) {
 	_, barrier, _ := mockBarrier(t)
 	view := NewBarrierView(barrier, "foo/")

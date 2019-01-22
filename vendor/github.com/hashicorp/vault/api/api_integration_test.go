@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/vault/builtin/logical/database"
 	"github.com/hashicorp/vault/builtin/logical/pki"
 	"github.com/hashicorp/vault/builtin/logical/transit"
-	"github.com/hashicorp/vault/helper/builtinplugins"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/vault"
 
@@ -24,7 +23,7 @@ import (
 	auditFile "github.com/hashicorp/vault/builtin/audit/file"
 	credUserpass "github.com/hashicorp/vault/builtin/credential/userpass"
 	vaulthttp "github.com/hashicorp/vault/http"
-	"github.com/ory/dockertest"
+	dockertest "gopkg.in/ory-am/dockertest.v3"
 )
 
 // testVaultServer creates a test vault cluster and returns a configured API
@@ -57,7 +56,6 @@ func testVaultServerUnseal(t testing.TB) (*api.Client, []string, func()) {
 			"pki":            pki.Factory,
 			"transit":        transit.Factory,
 		},
-		BuiltinRegistry: builtinplugins.Registry,
 	})
 }
 
@@ -147,12 +145,6 @@ func testPostgresDB(t testing.TB) (string, func()) {
 		t.Fatalf("postgresdb: could not start container: %s", err)
 	}
 
-	cleanup := func() {
-		if err := pool.Purge(resource); err != nil {
-			t.Fatalf("failed to cleanup local container: %s", err)
-		}
-	}
-
 	addr := fmt.Sprintf("postgres://postgres:secret@localhost:%s/database?sslmode=disable", resource.GetPort("5432/tcp"))
 
 	if err := pool.Retry(func() error {
@@ -163,9 +155,12 @@ func testPostgresDB(t testing.TB) (string, func()) {
 		defer db.Close()
 		return db.Ping()
 	}); err != nil {
-		cleanup()
 		t.Fatalf("postgresdb: could not connect: %s", err)
 	}
 
-	return addr, cleanup
+	return addr, func() {
+		if err := pool.Purge(resource); err != nil {
+			t.Fatalf("postgresdb: failed to cleanup container: %s", err)
+		}
+	}
 }

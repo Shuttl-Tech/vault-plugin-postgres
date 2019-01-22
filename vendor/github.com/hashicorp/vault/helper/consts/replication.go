@@ -1,10 +1,6 @@
 package consts
 
-import "time"
-
 type ReplicationState uint32
-
-var ReplicationStaleReadTimeout = 2 * time.Second
 
 const (
 	_ ReplicationState = iota
@@ -25,7 +21,6 @@ const (
 	ReplicationDRBootstrapping
 	ReplicationPerformanceDisabled
 	ReplicationDRDisabled
-	ReplicationPerformanceStandby
 )
 
 func (r ReplicationState) string() string {

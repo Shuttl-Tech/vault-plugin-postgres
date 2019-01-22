@@ -12,20 +12,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-test/deep"
 	"github.com/hashicorp/vault/builtin/logical/database/dbplugin"
-	"github.com/hashicorp/vault/helper/consts"
-	"github.com/hashicorp/vault/helper/namespace"
 	"github.com/hashicorp/vault/helper/pluginutil"
 	vaulthttp "github.com/hashicorp/vault/http"
 	"github.com/hashicorp/vault/logical"
-	"github.com/hashicorp/vault/logical/framework"
 	"github.com/hashicorp/vault/plugins/database/postgresql"
 	"github.com/hashicorp/vault/plugins/helper/database/dbutil"
 	"github.com/hashicorp/vault/vault"
 	"github.com/lib/pq"
 	"github.com/mitchellh/mapstructure"
-	"github.com/ory/dockertest"
+	dockertest "gopkg.in/ory-am/dockertest.v3"
 )
 
 var (
@@ -60,7 +56,7 @@ func preparePostgresTestContainer(t *testing.T, s logical.Storage, b logical.Bac
 	// exponential backoff-retry
 	if err = pool.Retry(func() error {
 		// This will cause a validation to run
-		resp, err := b.HandleRequest(namespace.RootContext(nil), &logical.Request{
+		resp, err := b.HandleRequest(context.Background(), &logical.Request{
 			Storage:   s,
 			Operation: logical.UpdateOperation,
 			Path:      "config/postgresql",
@@ -79,7 +75,6 @@ func preparePostgresTestContainer(t *testing.T, s logical.Storage, b logical.Bac
 
 		return nil
 	}); err != nil {
-		cleanup()
 		t.Fatalf("Could not connect to PostgreSQL docker container: %s", err)
 	}
 
@@ -102,7 +97,7 @@ func getCluster(t *testing.T) (*vault.TestCluster, logical.SystemView) {
 	os.Setenv(pluginutil.PluginCACertPEMEnv, cluster.CACertPEMFile)
 
 	sys := vault.TestDynamicSystemView(cores[0].Core)
-	vault.TestAddTestPlugin(t, cores[0].Core, "postgresql-database-plugin", consts.PluginTypeDatabase, "TestBackend_PluginMain", []string{}, "")
+	vault.TestAddTestPlugin(t, cores[0].Core, "postgresql-database-plugin", "TestBackend_PluginMain")
 
 	return cluster, sys
 }
@@ -190,170 +185,53 @@ func TestBackend_config_connection(t *testing.T) {
 	config := logical.TestBackendConfig()
 	config.StorageView = &logical.InmemStorage{}
 	config.System = sys
-	lb, err := Factory(context.Background(), config)
+	b, err := Factory(context.Background(), config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, ok := lb.(*databaseBackend)
-	if !ok {
-		t.Fatal("could not convert to database backend")
-	}
 	defer b.Cleanup(context.Background())
 
-	// Test creation
-	{
-		configData := map[string]interface{}{
-			"connection_url":    "sample_connection_url",
-			"someotherdata":     "testing",
-			"plugin_name":       "postgresql-database-plugin",
-			"verify_connection": false,
-			"allowed_roles":     []string{"*"},
-			"name":              "plugin-test",
-		}
-
-		configReq := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      "config/plugin-test",
-			Storage:   config.StorageView,
-			Data:      configData,
-		}
-
-		exists, err := b.connectionExistenceCheck()(context.Background(), configReq, &framework.FieldData{
-			Raw:    configData,
-			Schema: pathConfigurePluginConnection(b).Fields,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if exists {
-			t.Fatal("expected not exists")
-		}
-
-		resp, err = b.HandleRequest(namespace.RootContext(nil), configReq)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%v resp:%#v\n", err, resp)
-		}
-
-		expected := map[string]interface{}{
-			"plugin_name": "postgresql-database-plugin",
-			"connection_details": map[string]interface{}{
-				"connection_url": "sample_connection_url",
-				"someotherdata":  "testing",
-			},
-			"allowed_roles":                      []string{"*"},
-			"root_credentials_rotate_statements": []string{},
-		}
-		configReq.Operation = logical.ReadOperation
-		resp, err = b.HandleRequest(namespace.RootContext(nil), configReq)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		delete(resp.Data["connection_details"].(map[string]interface{}), "name")
-		if !reflect.DeepEqual(expected, resp.Data) {
-			t.Fatalf("bad: expected:%#v\nactual:%#v\n", expected, resp.Data)
-		}
+	configData := map[string]interface{}{
+		"connection_url":    "sample_connection_url",
+		"plugin_name":       "postgresql-database-plugin",
+		"verify_connection": false,
+		"allowed_roles":     []string{"*"},
 	}
 
-	// Test existence check and an update to a single connection detail parameter
-	{
-		configData := map[string]interface{}{
-			"connection_url":    "sample_convection_url",
-			"verify_connection": false,
-			"name":              "plugin-test",
-		}
-
-		configReq := &logical.Request{
-			Operation: logical.UpdateOperation,
-			Path:      "config/plugin-test",
-			Storage:   config.StorageView,
-			Data:      configData,
-		}
-
-		exists, err := b.connectionExistenceCheck()(context.Background(), configReq, &framework.FieldData{
-			Raw:    configData,
-			Schema: pathConfigurePluginConnection(b).Fields,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !exists {
-			t.Fatal("expected exists")
-		}
-
-		resp, err = b.HandleRequest(namespace.RootContext(nil), configReq)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%v resp:%#v\n", err, resp)
-		}
-
-		expected := map[string]interface{}{
-			"plugin_name": "postgresql-database-plugin",
-			"connection_details": map[string]interface{}{
-				"connection_url": "sample_convection_url",
-				"someotherdata":  "testing",
-			},
-			"allowed_roles":                      []string{"*"},
-			"root_credentials_rotate_statements": []string{},
-		}
-		configReq.Operation = logical.ReadOperation
-		resp, err = b.HandleRequest(namespace.RootContext(nil), configReq)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		delete(resp.Data["connection_details"].(map[string]interface{}), "name")
-		if !reflect.DeepEqual(expected, resp.Data) {
-			t.Fatalf("bad: expected:%#v\nactual:%#v\n", expected, resp.Data)
-		}
-	}
-
-	// Test an update to a non-details value
-	{
-		configData := map[string]interface{}{
-			"verify_connection": false,
-			"allowed_roles":     []string{"flu", "barre"},
-			"name":              "plugin-test",
-		}
-
-		configReq := &logical.Request{
-			Operation: logical.UpdateOperation,
-			Path:      "config/plugin-test",
-			Storage:   config.StorageView,
-			Data:      configData,
-		}
-
-		resp, err = b.HandleRequest(namespace.RootContext(nil), configReq)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%v resp:%#v\n", err, resp)
-		}
-
-		expected := map[string]interface{}{
-			"plugin_name": "postgresql-database-plugin",
-			"connection_details": map[string]interface{}{
-				"connection_url": "sample_convection_url",
-				"someotherdata":  "testing",
-			},
-			"allowed_roles":                      []string{"flu", "barre"},
-			"root_credentials_rotate_statements": []string{},
-		}
-		configReq.Operation = logical.ReadOperation
-		resp, err = b.HandleRequest(namespace.RootContext(nil), configReq)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		delete(resp.Data["connection_details"].(map[string]interface{}), "name")
-		if !reflect.DeepEqual(expected, resp.Data) {
-			t.Fatalf("bad: expected:%#v\nactual:%#v\n", expected, resp.Data)
-		}
-	}
-
-	req := &logical.Request{
-		Operation: logical.ListOperation,
+	configReq := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "config/plugin-test",
 		Storage:   config.StorageView,
-		Path:      "config/",
+		Data:      configData,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), configReq)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	expected := map[string]interface{}{
+		"plugin_name": "postgresql-database-plugin",
+		"connection_details": map[string]interface{}{
+			"connection_url": "sample_connection_url",
+		},
+		"allowed_roles":                      []string{"*"},
+		"root_credentials_rotate_statements": []string{},
+	}
+	configReq.Operation = logical.ReadOperation
+	resp, err = b.HandleRequest(context.Background(), configReq)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	delete(resp.Data["connection_details"].(map[string]interface{}), "name")
+	if !reflect.DeepEqual(expected, resp.Data) {
+		t.Fatalf("bad: expected:%#v\nactual:%#v\n", expected, resp.Data)
+	}
+
+	configReq.Operation = logical.ListOperation
+	configReq.Data = nil
+	configReq.Path = "config/"
+	resp, err = b.HandleRequest(context.Background(), configReq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +261,7 @@ func TestBackend_BadConnectionString(t *testing.T) {
 
 	respCheck := func(req *logical.Request) {
 		t.Helper()
-		resp, err := b.HandleRequest(namespace.RootContext(nil), req)
+		resp, err := b.HandleRequest(context.Background(), req)
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -442,7 +320,7 @@ func TestBackend_basic(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err := b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err := b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -459,7 +337,7 @@ func TestBackend_basic(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -471,7 +349,7 @@ func TestBackend_basic(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	credsResp, err := b.HandleRequest(namespace.RootContext(nil), req)
+	credsResp, err := b.HandleRequest(context.Background(), req)
 	if err != nil || (credsResp != nil && credsResp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, credsResp)
 	}
@@ -488,7 +366,7 @@ func TestBackend_basic(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -500,7 +378,7 @@ func TestBackend_basic(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	credsResp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	credsResp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (credsResp != nil && credsResp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, credsResp)
 	}
@@ -521,102 +399,48 @@ func TestBackend_basic(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+	// Get creds
+	data = map[string]interface{}{}
+	req = &logical.Request{
+		Operation: logical.ReadOperation,
+		Path:      "creds/plugin-role-test",
+		Storage:   config.StorageView,
+		Data:      data,
+	}
+	credsResp, err = b.HandleRequest(context.Background(), req)
+	if err != nil || (credsResp != nil && credsResp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, credsResp)
+	}
+	// Test for #3812
+	if credsResp.Secret.TTL != 5*time.Minute {
+		t.Fatalf("unexpected TTL of %d", credsResp.Secret.TTL)
+	}
+	if !testCredsExist(t, credsResp, connURL) {
+		t.Fatalf("Creds should exist")
+	}
+
+	// Revoke creds
+	resp, err = b.HandleRequest(context.Background(), &logical.Request{
+		Operation: logical.RevokeOperation,
+		Storage:   config.StorageView,
+		Secret: &logical.Secret{
+			InternalData: map[string]interface{}{
+				"secret_type": "creds",
+				"username":    credsResp.Data["username"],
+				"role":        "plugin-role-test",
+			},
+		},
+	})
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	// Get creds and revoke when the role stays in existence
-	{
-		data = map[string]interface{}{}
-		req = &logical.Request{
-			Operation: logical.ReadOperation,
-			Path:      "creds/plugin-role-test",
-			Storage:   config.StorageView,
-			Data:      data,
-		}
-		credsResp, err = b.HandleRequest(namespace.RootContext(nil), req)
-		if err != nil || (credsResp != nil && credsResp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, credsResp)
-		}
-		// Test for #3812
-		if credsResp.Secret.TTL != 5*time.Minute {
-			t.Fatalf("unexpected TTL of %d", credsResp.Secret.TTL)
-		}
-		if !testCredsExist(t, credsResp, connURL) {
-			t.Fatalf("Creds should exist")
-		}
-
-		// Revoke creds
-		resp, err = b.HandleRequest(namespace.RootContext(nil), &logical.Request{
-			Operation: logical.RevokeOperation,
-			Storage:   config.StorageView,
-			Secret: &logical.Secret{
-				InternalData: map[string]interface{}{
-					"secret_type": "creds",
-					"username":    credsResp.Data["username"],
-					"role":        "plugin-role-test",
-				},
-			},
-		})
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		if testCredsExist(t, credsResp, connURL) {
-			t.Fatalf("Creds should not exist")
-		}
-	}
-
-	// Get creds and revoke using embedded revocation data
-	{
-		data = map[string]interface{}{}
-		req = &logical.Request{
-			Operation: logical.ReadOperation,
-			Path:      "creds/plugin-role-test",
-			Storage:   config.StorageView,
-			Data:      data,
-		}
-		credsResp, err = b.HandleRequest(namespace.RootContext(nil), req)
-		if err != nil || (credsResp != nil && credsResp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, credsResp)
-		}
-		if !testCredsExist(t, credsResp, connURL) {
-			t.Fatalf("Creds should exist")
-		}
-
-		// Delete role, forcing us to rely on embedded data
-		req = &logical.Request{
-			Operation: logical.DeleteOperation,
-			Path:      "roles/plugin-role-test",
-			Storage:   config.StorageView,
-		}
-		resp, err = b.HandleRequest(namespace.RootContext(nil), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		// Revoke creds
-		resp, err = b.HandleRequest(namespace.RootContext(nil), &logical.Request{
-			Operation: logical.RevokeOperation,
-			Storage:   config.StorageView,
-			Secret: &logical.Secret{
-				InternalData: map[string]interface{}{
-					"secret_type":           "creds",
-					"username":              credsResp.Data["username"],
-					"role":                  "plugin-role-test",
-					"db_name":               "plugin-test",
-					"revocation_statements": nil,
-				},
-			},
-		})
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		if testCredsExist(t, credsResp, connURL) {
-			t.Fatalf("Creds should not exist")
-		}
+	if testCredsExist(t, credsResp, connURL) {
+		t.Fatalf("Creds should not exist")
 	}
 }
 
@@ -649,7 +473,7 @@ func TestBackend_connectionCrud(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err := b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err := b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -668,7 +492,7 @@ func TestBackend_connectionCrud(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -687,7 +511,7 @@ func TestBackend_connectionCrud(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -696,7 +520,7 @@ func TestBackend_connectionCrud(t *testing.T) {
 	}
 
 	req.Operation = logical.ReadOperation
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -708,7 +532,7 @@ func TestBackend_connectionCrud(t *testing.T) {
 	req.Operation = logical.UpdateOperation
 	connURL = strings.Replace(connURL, "postgres:secret", "{{username}}:{{password}}", -1)
 	data["connection_url"] = connURL
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -721,17 +545,17 @@ func TestBackend_connectionCrud(t *testing.T) {
 			"connection_url": connURL,
 		},
 		"allowed_roles":                      []string{"plugin-role-test"},
-		"root_credentials_rotate_statements": []string(nil),
+		"root_credentials_rotate_statements": []string{},
 	}
 	req.Operation = logical.ReadOperation
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
 	delete(resp.Data["connection_details"].(map[string]interface{}), "name")
-	if diff := deep.Equal(resp.Data, expected); diff != nil {
-		t.Fatal(diff)
+	if !reflect.DeepEqual(expected, resp.Data) {
+		t.Fatalf("bad: expected:%#v\nactual:%#v\n", expected, resp.Data)
 	}
 
 	// Reset Connection
@@ -742,7 +566,7 @@ func TestBackend_connectionCrud(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -755,7 +579,7 @@ func TestBackend_connectionCrud(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	credsResp, err := b.HandleRequest(namespace.RootContext(nil), req)
+	credsResp, err := b.HandleRequest(context.Background(), req)
 	if err != nil || (credsResp != nil && credsResp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, credsResp)
 	}
@@ -776,14 +600,14 @@ func TestBackend_connectionCrud(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
 	// Read connection
 	req.Operation = logical.ReadOperation
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -802,13 +626,9 @@ func TestBackend_roleCrud(t *testing.T) {
 	config.StorageView = &logical.InmemStorage{}
 	config.System = sys
 
-	lb, err := Factory(context.Background(), config)
+	b, err := Factory(context.Background(), config)
 	if err != nil {
 		t.Fatal(err)
-	}
-	b, ok := lb.(*databaseBackend)
-	if !ok {
-		t.Fatal("could not convert to db backend")
 	}
 	defer b.Cleanup(context.Background())
 
@@ -826,237 +646,26 @@ func TestBackend_roleCrud(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err := b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err := b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	// Test role creation
-	{
-		data = map[string]interface{}{
-			"db_name":               "plugin-test",
-			"creation_statements":   testRole,
-			"revocation_statements": defaultRevocationSQL,
-			"default_ttl":           "5m",
-			"max_ttl":               "10m",
-		}
-		req = &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      "roles/plugin-role-test",
-			Storage:   config.StorageView,
-			Data:      data,
-		}
-		resp, err = b.HandleRequest(namespace.RootContext(nil), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		exists, err := b.pathRoleExistenceCheck()(context.Background(), req, &framework.FieldData{
-			Raw:    data,
-			Schema: pathRoles(b).Fields,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if exists {
-			t.Fatal("expected not exists")
-		}
-
-		// Read the role
-		data = map[string]interface{}{}
-		req = &logical.Request{
-			Operation: logical.ReadOperation,
-			Path:      "roles/plugin-role-test",
-			Storage:   config.StorageView,
-			Data:      data,
-		}
-		resp, err = b.HandleRequest(namespace.RootContext(nil), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		expected := dbplugin.Statements{
-			Creation:   []string{strings.TrimSpace(testRole)},
-			Revocation: []string{strings.TrimSpace(defaultRevocationSQL)},
-			Rollback:   []string{},
-			Renewal:    []string{},
-		}
-
-		actual := dbplugin.Statements{
-			Creation:   resp.Data["creation_statements"].([]string),
-			Revocation: resp.Data["revocation_statements"].([]string),
-			Rollback:   resp.Data["rollback_statements"].([]string),
-			Renewal:    resp.Data["renew_statements"].([]string),
-		}
-
-		if diff := deep.Equal(expected, actual); diff != nil {
-			t.Fatal(diff)
-		}
-
-		if diff := deep.Equal(resp.Data["db_name"], "plugin-test"); diff != nil {
-			t.Fatal(diff)
-		}
-		if diff := deep.Equal(resp.Data["default_ttl"], float64(300)); diff != nil {
-			t.Fatal(diff)
-		}
-		if diff := deep.Equal(resp.Data["max_ttl"], float64(600)); diff != nil {
-			t.Fatal(diff)
-		}
+	// Create a role
+	data = map[string]interface{}{
+		"db_name":               "plugin-test",
+		"creation_statements":   testRole,
+		"revocation_statements": defaultRevocationSQL,
+		"default_ttl":           "5m",
+		"max_ttl":               "10m",
 	}
-
-	// Test role modification of TTL
-	{
-		data = map[string]interface{}{
-			"name":    "plugin-role-test",
-			"max_ttl": "7m",
-		}
-		req = &logical.Request{
-			Operation: logical.UpdateOperation,
-			Path:      "roles/plugin-role-test",
-			Storage:   config.StorageView,
-			Data:      data,
-		}
-		resp, err = b.HandleRequest(namespace.RootContext(nil), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%v resp:%#v\n", err, resp)
-		}
-
-		exists, err := b.pathRoleExistenceCheck()(context.Background(), req, &framework.FieldData{
-			Raw:    data,
-			Schema: pathRoles(b).Fields,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !exists {
-			t.Fatal("expected exists")
-		}
-
-		// Read the role
-		data = map[string]interface{}{}
-		req = &logical.Request{
-			Operation: logical.ReadOperation,
-			Path:      "roles/plugin-role-test",
-			Storage:   config.StorageView,
-			Data:      data,
-		}
-		resp, err = b.HandleRequest(namespace.RootContext(nil), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		expected := dbplugin.Statements{
-			Creation:   []string{strings.TrimSpace(testRole)},
-			Revocation: []string{strings.TrimSpace(defaultRevocationSQL)},
-			Rollback:   []string{},
-			Renewal:    []string{},
-		}
-
-		actual := dbplugin.Statements{
-			Creation:   resp.Data["creation_statements"].([]string),
-			Revocation: resp.Data["revocation_statements"].([]string),
-			Rollback:   resp.Data["rollback_statements"].([]string),
-			Renewal:    resp.Data["renew_statements"].([]string),
-		}
-
-		if !reflect.DeepEqual(expected, actual) {
-			t.Fatalf("Statements did not match, expected %#v, got %#v", expected, actual)
-		}
-
-		if diff := deep.Equal(resp.Data["db_name"], "plugin-test"); diff != nil {
-			t.Fatal(diff)
-		}
-		if diff := deep.Equal(resp.Data["default_ttl"], float64(300)); diff != nil {
-			t.Fatal(diff)
-		}
-		if diff := deep.Equal(resp.Data["max_ttl"], float64(420)); diff != nil {
-			t.Fatal(diff)
-		}
-
-	}
-
-	// Test role modification of statements
-	{
-		data = map[string]interface{}{
-			"name":                  "plugin-role-test",
-			"creation_statements":   []string{testRole, testRole},
-			"revocation_statements": []string{defaultRevocationSQL, defaultRevocationSQL},
-			"rollback_statements":   testRole,
-			"renew_statements":      defaultRevocationSQL,
-		}
-		req = &logical.Request{
-			Operation: logical.UpdateOperation,
-			Path:      "roles/plugin-role-test",
-			Storage:   config.StorageView,
-			Data:      data,
-		}
-		resp, err = b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%v resp:%#v\n", err, resp)
-		}
-
-		exists, err := b.pathRoleExistenceCheck()(context.Background(), req, &framework.FieldData{
-			Raw:    data,
-			Schema: pathRoles(b).Fields,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !exists {
-			t.Fatal("expected exists")
-		}
-
-		// Read the role
-		data = map[string]interface{}{}
-		req = &logical.Request{
-			Operation: logical.ReadOperation,
-			Path:      "roles/plugin-role-test",
-			Storage:   config.StorageView,
-			Data:      data,
-		}
-		resp, err = b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		expected := dbplugin.Statements{
-			Creation:   []string{strings.TrimSpace(testRole), strings.TrimSpace(testRole)},
-			Rollback:   []string{strings.TrimSpace(testRole)},
-			Revocation: []string{strings.TrimSpace(defaultRevocationSQL), strings.TrimSpace(defaultRevocationSQL)},
-			Renewal:    []string{strings.TrimSpace(defaultRevocationSQL)},
-		}
-
-		actual := dbplugin.Statements{
-			Creation:   resp.Data["creation_statements"].([]string),
-			Revocation: resp.Data["revocation_statements"].([]string),
-			Rollback:   resp.Data["rollback_statements"].([]string),
-			Renewal:    resp.Data["renew_statements"].([]string),
-		}
-
-		if diff := deep.Equal(expected, actual); diff != nil {
-			t.Fatal(diff)
-		}
-
-		if diff := deep.Equal(resp.Data["db_name"], "plugin-test"); diff != nil {
-			t.Fatal(diff)
-		}
-		if diff := deep.Equal(resp.Data["default_ttl"], float64(300)); diff != nil {
-			t.Fatal(diff)
-		}
-		if diff := deep.Equal(resp.Data["max_ttl"], float64(420)); diff != nil {
-			t.Fatal(diff)
-		}
-	}
-
-	// Delete the role
-	data = map[string]interface{}{}
 	req = &logical.Request{
-		Operation: logical.DeleteOperation,
+		Operation: logical.UpdateOperation,
 		Path:      "roles/plugin-role-test",
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -1069,7 +678,49 @@ func TestBackend_roleCrud(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	expected := dbplugin.Statements{
+		Creation:   []string{strings.TrimSpace(testRole)},
+		Revocation: []string{strings.TrimSpace(defaultRevocationSQL)},
+	}
+
+	actual := dbplugin.Statements{
+		Creation:   resp.Data["creation_statements"].([]string),
+		Revocation: resp.Data["revocation_statements"].([]string),
+		Rollback:   resp.Data["rollback_statements"].([]string),
+		Renewal:    resp.Data["renew_statements"].([]string),
+	}
+
+	if !reflect.DeepEqual(expected, actual) {
+		t.Fatalf("Statements did not match, expected %#v, got %#v", expected, actual)
+	}
+
+	// Delete the role
+	data = map[string]interface{}{}
+	req = &logical.Request{
+		Operation: logical.DeleteOperation,
+		Path:      "roles/plugin-role-test",
+		Storage:   config.StorageView,
+		Data:      data,
+	}
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Read the role
+	data = map[string]interface{}{}
+	req = &logical.Request{
+		Operation: logical.ReadOperation,
+		Path:      "roles/plugin-role-test",
+		Storage:   config.StorageView,
+		Data:      data,
+	}
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -1107,7 +758,7 @@ func TestBackend_allowedRoles(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err := b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err := b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -1125,7 +776,7 @@ func TestBackend_allowedRoles(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -1142,7 +793,7 @@ func TestBackend_allowedRoles(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -1155,7 +806,7 @@ func TestBackend_allowedRoles(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	credsResp, err := b.HandleRequest(namespace.RootContext(nil), req)
+	credsResp, err := b.HandleRequest(context.Background(), req)
 	if err != logical.ErrPermissionDenied {
 		t.Fatalf("expected error to be:%s got:%#v\n", logical.ErrPermissionDenied, err)
 	}
@@ -1172,7 +823,7 @@ func TestBackend_allowedRoles(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -1185,7 +836,7 @@ func TestBackend_allowedRoles(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	credsResp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	credsResp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (credsResp != nil && credsResp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, credsResp)
 	}
@@ -1206,7 +857,7 @@ func TestBackend_allowedRoles(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -1219,7 +870,7 @@ func TestBackend_allowedRoles(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	credsResp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	credsResp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (credsResp != nil && credsResp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, credsResp)
 	}
@@ -1240,7 +891,7 @@ func TestBackend_allowedRoles(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -1253,7 +904,7 @@ func TestBackend_allowedRoles(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	credsResp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	credsResp, err = b.HandleRequest(context.Background(), req)
 	if err != logical.ErrPermissionDenied {
 		t.Fatalf("expected error to be:%s got:%#v\n", logical.ErrPermissionDenied, err)
 	}
@@ -1266,7 +917,7 @@ func TestBackend_allowedRoles(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	credsResp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	credsResp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (credsResp != nil && credsResp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, credsResp)
 	}
@@ -1309,7 +960,7 @@ func TestBackend_RotateRootCredentials(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err := b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err := b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -1326,7 +977,7 @@ func TestBackend_RotateRootCredentials(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -1338,7 +989,7 @@ func TestBackend_RotateRootCredentials(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	credsResp, err := b.HandleRequest(namespace.RootContext(nil), req)
+	credsResp, err := b.HandleRequest(context.Background(), req)
 	if err != nil || (credsResp != nil && credsResp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, credsResp)
 	}
@@ -1350,7 +1001,7 @@ func TestBackend_RotateRootCredentials(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	resp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (credsResp != nil && credsResp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, credsResp)
 	}
@@ -1371,7 +1022,7 @@ func TestBackend_RotateRootCredentials(t *testing.T) {
 		Storage:   config.StorageView,
 		Data:      data,
 	}
-	credsResp, err = b.HandleRequest(namespace.RootContext(nil), req)
+	credsResp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (credsResp != nil && credsResp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, credsResp)
 	}

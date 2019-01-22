@@ -7,17 +7,13 @@ import (
 
 	log "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/helper/logging"
-	"github.com/hashicorp/vault/helper/namespace"
 	"github.com/hashicorp/vault/logical"
 )
 
 func mockPolicyStore(t *testing.T) *PolicyStore {
 	_, barrier, _ := mockBarrier(t)
 	view := NewBarrierView(barrier, "foo/")
-	p, err := NewPolicyStore(context.Background(), nil, view, logical.TestSystemView(), logging.NewVaultLogger(log.Trace))
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := NewPolicyStore(context.Background(), nil, view, logical.TestSystemView(), logging.NewVaultLogger(log.Trace))
 	return p
 }
 
@@ -26,93 +22,49 @@ func mockPolicyStoreNoCache(t *testing.T) *PolicyStore {
 	sysView.CachingDisabledVal = true
 	_, barrier, _ := mockBarrier(t)
 	view := NewBarrierView(barrier, "foo/")
-	p, err := NewPolicyStore(context.Background(), nil, view, sysView, logging.NewVaultLogger(log.Trace))
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := NewPolicyStore(context.Background(), nil, view, sysView, logging.NewVaultLogger(log.Trace))
 	return p
 }
 
-func mockPolicyWithCore(t *testing.T, disableCache bool) (*Core, *PolicyStore) {
-	conf := &CoreConfig{
-		DisableCache: disableCache,
-	}
-	core, _, _ := TestCoreUnsealedWithConfig(t, conf)
-	ps := core.policyStore
-
-	return core, ps
-}
-
 func TestPolicyStore_Root(t *testing.T) {
-	t.Run("root", func(t *testing.T) {
-		t.Parallel()
+	ps := mockPolicyStore(t)
 
-		core, _, _ := TestCoreUnsealed(t)
-		ps := core.policyStore
-		testPolicyRoot(t, ps, namespace.RootNamespace, true)
-	})
-}
-
-func testPolicyRoot(t *testing.T, ps *PolicyStore, ns *namespace.Namespace, expectFound bool) {
 	// Get should return a special policy
-	ctx := namespace.ContextWithNamespace(context.Background(), ns)
-	p, err := ps.GetPolicy(ctx, "root", PolicyTypeToken)
+	p, err := ps.GetPolicy(context.Background(), "root", PolicyTypeToken)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-
-	// Handle whether a root token is expected
-	if expectFound {
-		if p == nil {
-			t.Fatalf("bad: %v", p)
-		}
-		if p.Name != "root" {
-			t.Fatalf("bad: %v", p)
-		}
-	} else {
-		if p != nil {
-			t.Fatal("expected nil root policy")
-		}
-		// Create root policy for subsequent modification and deletion failure
-		// tests
-		p = &Policy{
-			Name: "root",
-		}
+	if p == nil {
+		t.Fatalf("bad: %v", p)
+	}
+	if p.Name != "root" {
+		t.Fatalf("bad: %v", p)
 	}
 
 	// Set should fail
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	err = ps.SetPolicy(ctx, p)
+	err = ps.SetPolicy(context.Background(), p)
 	if err.Error() != `cannot update "root" policy` {
 		t.Fatalf("err: %v", err)
 	}
 
 	// Delete should fail
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	err = ps.DeletePolicy(ctx, "root", PolicyTypeACL)
+	err = ps.DeletePolicy(context.Background(), "root", PolicyTypeACL)
 	if err.Error() != `cannot delete "root" policy` {
 		t.Fatalf("err: %v", err)
 	}
 }
 
 func TestPolicyStore_CRUD(t *testing.T) {
-	t.Run("root-ns", func(t *testing.T) {
-		t.Run("cached", func(t *testing.T) {
-			_, ps := mockPolicyWithCore(t, false)
-			testPolicyStoreCRUD(t, ps, namespace.RootNamespace)
-		})
+	ps := mockPolicyStore(t)
+	testPolicyStore_CRUD(t, ps)
 
-		t.Run("no-cache", func(t *testing.T) {
-			_, ps := mockPolicyWithCore(t, true)
-			testPolicyStoreCRUD(t, ps, namespace.RootNamespace)
-		})
-	})
+	ps = mockPolicyStoreNoCache(t)
+	testPolicyStore_CRUD(t, ps)
 }
 
-func testPolicyStoreCRUD(t *testing.T, ps *PolicyStore, ns *namespace.Namespace) {
+func testPolicyStore_CRUD(t *testing.T, ps *PolicyStore) {
 	// Get should return nothing
-	ctx := namespace.ContextWithNamespace(context.Background(), ns)
-	p, err := ps.GetPolicy(ctx, "Dev", PolicyTypeToken)
+	p, err := ps.GetPolicy(context.Background(), "Dev", PolicyTypeToken)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -121,33 +73,29 @@ func testPolicyStoreCRUD(t *testing.T, ps *PolicyStore, ns *namespace.Namespace)
 	}
 
 	// Delete should be no-op
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	err = ps.DeletePolicy(ctx, "deV", PolicyTypeACL)
+	err = ps.DeletePolicy(context.Background(), "deV", PolicyTypeACL)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
 
 	// List should be blank
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	out, err := ps.ListPolicies(ctx, PolicyTypeACL)
+	out, err := ps.ListPolicies(context.Background(), PolicyTypeACL)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	if len(out) != 1 {
+	if len(out) != 0 {
 		t.Fatalf("bad: %v", out)
 	}
 
 	// Set should work
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	policy, _ := ParseACLPolicy(ns, aclPolicy)
-	err = ps.SetPolicy(ctx, policy)
+	policy, _ := ParseACLPolicy(aclPolicy)
+	err = ps.SetPolicy(context.Background(), policy)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
 
 	// Get should work
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	p, err = ps.GetPolicy(ctx, "dEv", PolicyTypeToken)
+	p, err = ps.GetPolicy(context.Background(), "dEv", PolicyTypeToken)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -155,41 +103,23 @@ func testPolicyStoreCRUD(t *testing.T, ps *PolicyStore, ns *namespace.Namespace)
 		t.Fatalf("bad: %v", p)
 	}
 
-	// List should contain two elements
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	out, err = ps.ListPolicies(ctx, PolicyTypeACL)
+	// List should be one element
+	out, err = ps.ListPolicies(context.Background(), PolicyTypeACL)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	if len(out) != 2 {
+	if len(out) != 1 || out[0] != "dev" {
 		t.Fatalf("bad: %v", out)
-	}
-
-	expected := []string{"default", "dev"}
-	if !reflect.DeepEqual(expected, out) {
-		t.Fatalf("expected: %v\ngot: %v", expected, out)
 	}
 
 	// Delete should be clear the entry
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	err = ps.DeletePolicy(ctx, "Dev", PolicyTypeACL)
+	err = ps.DeletePolicy(context.Background(), "Dev", PolicyTypeACL)
 	if err != nil {
 		t.Fatalf("err: %v", err)
-	}
-
-	// List should contain one element
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	out, err = ps.ListPolicies(ctx, PolicyTypeACL)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	if len(out) != 1 || out[0] != "default" {
-		t.Fatalf("bad: %v", out)
 	}
 
 	// Get should fail
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	p, err = ps.GetPolicy(ctx, "deV", PolicyTypeToken)
+	p, err = ps.GetPolicy(context.Background(), "deV", PolicyTypeToken)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -198,18 +128,16 @@ func testPolicyStoreCRUD(t *testing.T, ps *PolicyStore, ns *namespace.Namespace)
 	}
 }
 
-func TestPolicyStore_Predefined(t *testing.T) {
-	t.Run("root-ns", func(t *testing.T) {
-		_, ps := mockPolicyWithCore(t, false)
-		testPolicyStorePredefined(t, ps, namespace.RootNamespace)
-	})
-}
-
 // Test predefined policy handling
-func testPolicyStorePredefined(t *testing.T, ps *PolicyStore, ns *namespace.Namespace) {
+func TestPolicyStore_Predefined(t *testing.T) {
+	core, _, _ := TestCoreUnsealed(t)
+	// Ensure both default policies are created
+	err := core.setupPolicyStore(context.Background())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
 	// List should be two elements
-	ctx := namespace.ContextWithNamespace(context.Background(), ns)
-	out, err := ps.ListPolicies(ctx, PolicyTypeACL)
+	out, err := core.policyStore.ListPolicies(context.Background(), PolicyTypeACL)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -218,9 +146,7 @@ func testPolicyStorePredefined(t *testing.T, ps *PolicyStore, ns *namespace.Name
 		t.Fatalf("bad: %v", out)
 	}
 
-	// Response-wrapping policy checks
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	pCubby, err := ps.GetPolicy(ctx, "response-wrapping", PolicyTypeToken)
+	pCubby, err := core.policyStore.GetPolicy(context.Background(), "response-wrapping", PolicyTypeToken)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -230,72 +156,49 @@ func testPolicyStorePredefined(t *testing.T, ps *PolicyStore, ns *namespace.Name
 	if pCubby.Raw != responseWrappingPolicy {
 		t.Fatalf("bad: expected\n%s\ngot\n%s\n", responseWrappingPolicy, pCubby.Raw)
 	}
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	err = ps.SetPolicy(ctx, pCubby)
-	if err == nil {
-		t.Fatalf("expected err setting %s", pCubby.Name)
-	}
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	err = ps.DeletePolicy(ctx, pCubby.Name, PolicyTypeACL)
-	if err == nil {
-		t.Fatalf("expected err deleting %s", pCubby.Name)
-	}
-
-	// Root policy checks, behavior depending on namespace
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	pRoot, err := ps.GetPolicy(ctx, "root", PolicyTypeToken)
+	pRoot, err := core.policyStore.GetPolicy(context.Background(), "root", PolicyTypeToken)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	if ns == namespace.RootNamespace {
-		if pRoot == nil {
-			t.Fatal("nil root policy")
-		}
-	} else {
-		if pRoot != nil {
-			t.Fatal("expected nil root policy")
-		}
-		pRoot = &Policy{
-			Name: "root",
-		}
+	if pRoot == nil {
+		t.Fatal("nil root policy")
 	}
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	err = ps.SetPolicy(ctx, pRoot)
+
+	err = core.policyStore.SetPolicy(context.Background(), pCubby)
+	if err == nil {
+		t.Fatalf("expected err setting %s", pCubby.Name)
+	}
+	err = core.policyStore.SetPolicy(context.Background(), pRoot)
 	if err == nil {
 		t.Fatalf("expected err setting %s", pRoot.Name)
 	}
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	err = ps.DeletePolicy(ctx, pRoot.Name, PolicyTypeACL)
+	err = core.policyStore.DeletePolicy(context.Background(), pCubby.Name, PolicyTypeACL)
+	if err == nil {
+		t.Fatalf("expected err deleting %s", pCubby.Name)
+	}
+	err = core.policyStore.DeletePolicy(context.Background(), pRoot.Name, PolicyTypeACL)
 	if err == nil {
 		t.Fatalf("expected err deleting %s", pRoot.Name)
 	}
 }
 
 func TestPolicyStore_ACL(t *testing.T) {
-	t.Run("root-ns", func(t *testing.T) {
-		_, ps := mockPolicyWithCore(t, false)
-		testPolicyStoreACL(t, ps, namespace.RootNamespace)
-	})
-}
+	ps := mockPolicyStore(t)
 
-func testPolicyStoreACL(t *testing.T, ps *PolicyStore, ns *namespace.Namespace) {
-	ctx := namespace.ContextWithNamespace(context.Background(), ns)
-	policy, _ := ParseACLPolicy(ns, aclPolicy)
-	err := ps.SetPolicy(ctx, policy)
+	policy, _ := ParseACLPolicy(aclPolicy)
+	err := ps.SetPolicy(context.Background(), policy)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	policy, _ = ParseACLPolicy(ns, aclPolicy2)
-	err = ps.SetPolicy(ctx, policy)
+	policy, _ = ParseACLPolicy(aclPolicy2)
+	err = ps.SetPolicy(context.Background(), policy)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
 
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	acl, err := ps.ACL(ctx, nil, map[string][]string{ns.ID: []string{"dev", "ops"}})
+	acl, err := ps.ACL(context.Background(), "dev", "ops")
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	testLayeredACL(t, acl, ns)
+	testLayeredACL(t, acl)
 }

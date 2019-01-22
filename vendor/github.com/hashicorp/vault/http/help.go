@@ -3,8 +3,6 @@ package http
 import (
 	"net/http"
 
-	"github.com/hashicorp/errwrap"
-	"github.com/hashicorp/vault/helper/namespace"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/vault"
 )
@@ -26,31 +24,22 @@ func wrapHelpHandler(h http.Handler, core *vault.Core) http.Handler {
 	})
 }
 
-func handleHelp(core *vault.Core, w http.ResponseWriter, r *http.Request) {
-	ns, err := namespace.FromContext(r.Context())
-	if err != nil {
-		respondError(w, http.StatusBadRequest, nil)
+func handleHelp(core *vault.Core, w http.ResponseWriter, req *http.Request) {
+	path, ok := stripPrefix("/v1/", req.URL.Path)
+	if !ok {
+		respondError(w, http.StatusNotFound, nil)
 		return
 	}
-	path := ns.TrimmedPath(r.URL.Path[len("/v1/"):])
 
-	req, err := requestAuth(core, r, &logical.Request{
+	lreq := requestAuth(core, req, &logical.Request{
 		Operation:  logical.HelpOperation,
 		Path:       path,
-		Connection: getConnection(r),
+		Connection: getConnection(req),
 	})
-	if err != nil {
-		if errwrap.Contains(err, logical.ErrPermissionDenied.Error()) {
-			respondError(w, http.StatusForbidden, nil)
-			return
-		}
-		respondError(w, http.StatusBadRequest, errwrap.Wrapf("error performing token check: {{err}}", err))
-		return
-	}
 
-	resp, err := core.HandleRequest(r.Context(), req)
+	resp, err := core.HandleRequest(lreq)
 	if err != nil {
-		respondErrorCommon(w, req, resp, err)
+		respondErrorCommon(w, lreq, resp, err)
 		return
 	}
 

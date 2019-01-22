@@ -15,7 +15,6 @@ import (
 type backendEntry struct {
 	backend audit.Backend
 	view    *BarrierView
-	local   bool
 }
 
 // AuditBroker is used to provide a single ingest interface to auditable
@@ -36,13 +35,12 @@ func NewAuditBroker(log log.Logger) *AuditBroker {
 }
 
 // Register is used to add new audit backend to the broker
-func (a *AuditBroker) Register(name string, b audit.Backend, v *BarrierView, local bool) {
+func (a *AuditBroker) Register(name string, b audit.Backend, v *BarrierView) {
 	a.Lock()
 	defer a.Unlock()
 	a.backends[name] = backendEntry{
 		backend: b,
 		view:    v,
-		local:   local,
 	}
 }
 
@@ -59,17 +57,6 @@ func (a *AuditBroker) IsRegistered(name string) bool {
 	defer a.RUnlock()
 	_, ok := a.backends[name]
 	return ok
-}
-
-// IsLocal is used to check if a given audit backend is registered
-func (a *AuditBroker) IsLocal(name string) (bool, error) {
-	a.RLock()
-	defer a.RUnlock()
-	be, ok := a.backends[name]
-	if ok {
-		return be.local, nil
-	}
-	return false, fmt.Errorf("unknown audit backend %q", name)
 }
 
 // GetHash returns a hash using the salt of the given backend

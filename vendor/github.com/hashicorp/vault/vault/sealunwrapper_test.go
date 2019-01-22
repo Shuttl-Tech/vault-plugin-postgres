@@ -1,4 +1,7 @@
-// +build !enterprise
+// +build !ent
+// +build !prem
+// +build !pro
+// +build !hsm
 
 package vault
 
@@ -56,7 +59,7 @@ func performTestSealUnwrapper(t *testing.T, phys physical.Backend, logger log.Lo
 	// Save the original for comparison later
 	origBytes := make([]byte, len(entry.Value))
 	copy(origBytes, entry.Value)
-	se := &physical.EncryptedBlobInfo{
+	se := &physical.SealWrapEntry{
 		Ciphertext: entry.Value,
 	}
 	seb, err := proto.Marshal(se)
@@ -82,7 +85,7 @@ func performTestSealUnwrapper(t *testing.T, phys physical.Backend, logger log.Lo
 			t.Fatal(err)
 		}
 		if !bytes.Equal(entry.Value, origBytes) {
-			t.Fatalf("mismatched original bytes and unwrapped entry bytes:\ngot:\n%v\nexpected:\n%v", entry.Value, origBytes)
+			t.Fatalf("mismatched original bytes and unwrapped entry bytes: %v vs %v", entry.Value, origBytes)
 		}
 		underlyingEntry, err := phys.Get(ctx, "core/master")
 		if err != nil {
@@ -91,11 +94,11 @@ func performTestSealUnwrapper(t *testing.T, phys physical.Backend, logger log.Lo
 		switch wrapped {
 		case true:
 			if !bytes.Equal(underlyingEntry.Value, pBytes) {
-				t.Fatalf("mismatched original bytes and proto entry bytes:\ngot:\n%v\nexpected:\n%v", underlyingEntry.Value, pBytes)
+				t.Fatalf("mismatched original bytes and proto entry bytes: %v vs %v", underlyingEntry.Value, pBytes)
 			}
 		default:
 			if !bytes.Equal(underlyingEntry.Value, origBytes) {
-				t.Fatalf("mismatched original bytes and unwrapped entry bytes:\ngot:\n%v\nexpected:\n%v", underlyingEntry.Value, origBytes)
+				t.Fatalf("mismatched original bytes and unwrapped entry bytes: %v vs %v", underlyingEntry.Value, origBytes)
 			}
 		}
 	}

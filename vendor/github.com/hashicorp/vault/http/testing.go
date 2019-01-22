@@ -25,29 +25,18 @@ func TestListener(tb testing.TB) (net.Listener, string) {
 	return ln, addr
 }
 
-func TestServerWithListenerAndProperties(tb testing.TB, ln net.Listener, addr string, core *vault.Core, props *vault.HandlerProperties) {
+func TestServerWithListener(tb testing.TB, ln net.Listener, addr string, core *vault.Core) {
 	// Create a muxer to handle our requests so that we can authenticate
 	// for tests.
 	mux := http.NewServeMux()
 	mux.Handle("/_test/auth", http.HandlerFunc(testHandleAuth))
-	mux.Handle("/", Handler(props))
+	mux.Handle("/", Handler(core))
 
 	server := &http.Server{
-		Addr:     ln.Addr().String(),
-		Handler:  mux,
-		ErrorLog: core.Logger().StandardLogger(nil),
+		Addr:    ln.Addr().String(),
+		Handler: mux,
 	}
 	go server.Serve(ln)
-}
-
-func TestServerWithListener(tb testing.TB, ln net.Listener, addr string, core *vault.Core) {
-	// Create a muxer to handle our requests so that we can authenticate
-	// for tests.
-	props := &vault.HandlerProperties{
-		Core:           core,
-		MaxRequestSize: DefaultMaxRequestSize,
-	}
-	TestServerWithListenerAndProperties(tb, ln, addr, core, props)
 }
 
 func TestServer(tb testing.TB, core *vault.Core) (net.Listener, string) {

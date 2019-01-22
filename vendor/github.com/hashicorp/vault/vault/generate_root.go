@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/errwrap"
-	uuid "github.com/hashicorp/go-uuid"
+	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/vault/helper/consts"
 	"github.com/hashicorp/vault/helper/pgpkeys"
 	"github.com/hashicorp/vault/helper/xor"
@@ -20,10 +20,6 @@ var (
 	// GenerateStandardRootTokenStrategy is the strategy used to generate a
 	// typical root token
 	GenerateStandardRootTokenStrategy GenerateRootStrategy = generateStandardRootToken{}
-
-	// GenerateDROperationTokenStrategy is the strategy used to generate a
-	// DR operational token
-	GenerateDROperationTokenStrategy GenerateRootStrategy = generateStandardRootToken{}
 )
 
 // GenerateRootStrategy allows us to swap out the strategy we want to use to
@@ -77,7 +73,7 @@ type GenerateRootResult struct {
 func (c *Core) GenerateRootProgress() (int, error) {
 	c.stateLock.RLock()
 	defer c.stateLock.RUnlock()
-	if c.Sealed() {
+	if c.sealed {
 		return 0, consts.ErrSealed
 	}
 	if c.standby {
@@ -95,7 +91,7 @@ func (c *Core) GenerateRootProgress() (int, error) {
 func (c *Core) GenerateRootConfiguration() (*GenerateRootConfig, error) {
 	c.stateLock.RLock()
 	defer c.stateLock.RUnlock()
-	if c.Sealed() {
+	if c.sealed {
 		return nil, consts.ErrSealed
 	}
 	if c.standby {
@@ -121,8 +117,12 @@ func (c *Core) GenerateRootInit(otp, pgpKey string, strategy GenerateRootStrateg
 	var fingerprint string
 	switch {
 	case len(otp) > 0:
-		if len(otp) != TokenLength+2 {
-			return fmt.Errorf("OTP string is wrong length")
+		otpBytes, err := base64.StdEncoding.DecodeString(otp)
+		if err != nil {
+			return errwrap.Wrapf("error decoding base64 OTP value: {{err}}", err)
+		}
+		if otpBytes == nil || len(otpBytes) != 16 {
+			return fmt.Errorf("decoded OTP value is invalid or wrong length")
 		}
 
 	case len(pgpKey) > 0:
@@ -136,12 +136,12 @@ func (c *Core) GenerateRootInit(otp, pgpKey string, strategy GenerateRootStrateg
 		fingerprint = fingerprints[0]
 
 	default:
-		return fmt.Errorf("otp or pgp_key parameter must be provided")
+		return fmt.Errorf("unreachable condition")
 	}
 
 	c.stateLock.RLock()
 	defer c.stateLock.RUnlock()
-	if c.Sealed() {
+	if c.sealed {
 		return consts.ErrSealed
 	}
 	if c.standby {
@@ -171,14 +171,8 @@ func (c *Core) GenerateRootInit(otp, pgpKey string, strategy GenerateRootStrateg
 	}
 
 	if c.logger.IsInfo() {
-		switch strategy.(type) {
-		case generateStandardRootToken:
-			c.logger.Info("root generation initialized", "nonce", c.generateRootConfig.Nonce)
-		default:
-			c.logger.Info("dr operation token generation initialized", "nonce", c.generateRootConfig.Nonce)
-		}
+		c.logger.Info("root generation initialized", "nonce", c.generateRootConfig.Nonce)
 	}
-
 	return nil
 }
 
@@ -217,7 +211,7 @@ func (c *Core) GenerateRootUpdate(ctx context.Context, key []byte, nonce string,
 	// Ensure we are already unsealed
 	c.stateLock.RLock()
 	defer c.stateLock.RUnlock()
-	if c.Sealed() {
+	if c.sealed {
 		return nil, consts.ErrSealed
 	}
 	if c.standby {
@@ -290,35 +284,45 @@ func (c *Core) GenerateRootUpdate(ctx context.Context, key []byte, nonce string,
 	}
 
 	// Run the generate strategy
-	token, cleanupFunc, err := strategy.generate(ctx, c)
+	tokenUUID, cleanupFunc, err := strategy.generate(ctx, c)
 	if err != nil {
 		return nil, err
 	}
 
-	var tokenBytes []byte
+	uuidBytes, err := uuid.ParseUUID(tokenUUID)
+	if err != nil {
+		cleanupFunc()
+		c.logger.Error("error getting generated token bytes", "error", err)
+		return nil, err
+	}
+	if uuidBytes == nil {
+		cleanupFunc()
+		c.logger.Error("got nil parsed UUID bytes")
+		return nil, fmt.Errorf("got nil parsed UUID bytes")
+	}
 
+	var tokenBytes []byte
 	// Get the encoded value first so that if there is an error we don't create
 	// the root token.
 	switch {
 	case len(c.generateRootConfig.OTP) > 0:
 		// This function performs decoding checks so rather than decode the OTP,
 		// just encode the value we're passing in.
-		tokenBytes, err = xor.XORBytes([]byte(c.generateRootConfig.OTP), []byte(token))
+		tokenBytes, err = xor.XORBase64(c.generateRootConfig.OTP, base64.StdEncoding.EncodeToString(uuidBytes))
 		if err != nil {
 			cleanupFunc()
 			c.logger.Error("xor of root token failed", "error", err)
 			return nil, err
 		}
-		token = base64.RawStdEncoding.EncodeToString(tokenBytes)
 
 	case len(c.generateRootConfig.PGPKey) > 0:
-		_, tokenBytesArr, err := pgpkeys.EncryptShares([][]byte{[]byte(token)}, []string{c.generateRootConfig.PGPKey})
+		_, tokenBytesArr, err := pgpkeys.EncryptShares([][]byte{[]byte(tokenUUID)}, []string{c.generateRootConfig.PGPKey})
 		if err != nil {
 			cleanupFunc()
 			c.logger.Error("error encrypting new root token", "error", err)
 			return nil, err
 		}
-		token = base64.StdEncoding.EncodeToString(tokenBytesArr[0])
+		tokenBytes = tokenBytesArr[0]
 
 	default:
 		cleanupFunc()
@@ -328,19 +332,12 @@ func (c *Core) GenerateRootUpdate(ctx context.Context, key []byte, nonce string,
 	results := &GenerateRootResult{
 		Progress:       progress,
 		Required:       config.SecretThreshold,
-		EncodedToken:   token,
+		EncodedToken:   base64.StdEncoding.EncodeToString(tokenBytes),
 		PGPFingerprint: c.generateRootConfig.PGPFingerprint,
 	}
 
-	switch strategy.(type) {
-	case generateStandardRootToken:
-		if c.logger.IsInfo() {
-			c.logger.Info("root generation finished", "nonce", c.generateRootConfig.Nonce)
-		}
-	default:
-		if c.logger.IsInfo() {
-			c.logger.Info("dr operation token generation finished", "nonce", c.generateRootConfig.Nonce)
-		}
+	if c.logger.IsInfo() {
+		c.logger.Info("root generation finished", "nonce", c.generateRootConfig.Nonce)
 	}
 
 	c.generateRootProgress = nil
@@ -352,7 +349,7 @@ func (c *Core) GenerateRootUpdate(ctx context.Context, key []byte, nonce string,
 func (c *Core) GenerateRootCancel() error {
 	c.stateLock.RLock()
 	defer c.stateLock.RUnlock()
-	if c.Sealed() {
+	if c.sealed {
 		return consts.ErrSealed
 	}
 	if c.standby {

@@ -2,9 +2,7 @@ package retryablehttp
 
 import (
 	"bytes"
-	"context"
 	"errors"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -50,52 +48,9 @@ func TestRequest(t *testing.T) {
 	}
 }
 
-// Since normal ways we would generate a Reader have special cases, use a
-// custom type here
-type custReader struct {
-	val string
-	pos int
-}
-
-func (c *custReader) Read(p []byte) (n int, err error) {
-	if c.val == "" {
-		c.val = "hello"
-	}
-	if c.pos >= len(c.val) {
-		return 0, io.EOF
-	}
-	var i int
-	for i = 0; i < len(p) && i+c.pos < len(c.val); i++ {
-		p[i] = c.val[i+c.pos]
-	}
-	c.pos += i
-	return i, nil
-}
-
 func TestClient_Do(t *testing.T) {
-	testBytes := []byte("hello")
-	// Native func
-	testClient_Do(t, ReaderFunc(func() (io.Reader, error) {
-		return bytes.NewReader(testBytes), nil
-	}))
-	// Native func, different Go type
-	testClient_Do(t, func() (io.Reader, error) {
-		return bytes.NewReader(testBytes), nil
-	})
-	// []byte
-	testClient_Do(t, testBytes)
-	// *bytes.Buffer
-	testClient_Do(t, bytes.NewBuffer(testBytes))
-	// *bytes.Reader
-	testClient_Do(t, bytes.NewReader(testBytes))
-	// io.ReadSeeker
-	testClient_Do(t, strings.NewReader(string(testBytes)))
-	// io.Reader
-	testClient_Do(t, &custReader{})
-}
-
-func testClient_Do(t *testing.T, body interface{}) {
 	// Create a request
+	body := bytes.NewReader([]byte("hello"))
 	req, err := NewRequest("PUT", "http://127.0.0.1:28934/v1/foo", body)
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -110,7 +65,7 @@ func testClient_Do(t *testing.T, body interface{}) {
 	client.RetryWaitMin = 10 * time.Millisecond
 	client.RetryWaitMax = 50 * time.Millisecond
 	client.RetryMax = 50
-	client.RequestLogHook = func(logger Logger, req *http.Request, retryNumber int) {
+	client.RequestLogHook = func(logger *log.Logger, req *http.Request, retryNumber int) {
 		retryCount = retryNumber
 
 		if logger != client.Logger {
@@ -275,7 +230,7 @@ func TestClient_RequestLogHook(t *testing.T) {
 	testURIPath := "/foo/bar"
 
 	client := NewClient()
-	client.RequestLogHook = func(logger Logger, req *http.Request, retry int) {
+	client.RequestLogHook = func(logger *log.Logger, req *http.Request, retry int) {
 		retries = retry
 
 		if logger != client.Logger {
@@ -325,7 +280,7 @@ func TestClient_ResponseLogHook(t *testing.T) {
 	client.RetryWaitMin = 10 * time.Millisecond
 	client.RetryWaitMax = 10 * time.Millisecond
 	client.RetryMax = 15
-	client.ResponseLogHook = func(logger Logger, resp *http.Response) {
+	client.ResponseLogHook = func(logger *log.Logger, resp *http.Response) {
 		if resp.StatusCode == 200 {
 			// Log something when we get a 200
 			logger.Printf("test_log_pass")
@@ -365,40 +320,6 @@ func TestClient_ResponseLogHook(t *testing.T) {
 	}
 }
 
-func TestClient_RequestWithContext(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write([]byte("test_200_body"))
-	}))
-	defer ts.Close()
-
-	req, err := NewRequest(http.MethodGet, ts.URL, nil)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	ctx, cancel := context.WithCancel(req.Request.Context())
-	req = req.WithContext(ctx)
-
-	client := NewClient()
-
-	called := 0
-	client.CheckRetry = func(_ context.Context, resp *http.Response, err error) (bool, error) {
-		called++
-		return DefaultRetryPolicy(req.Request.Context(), resp, err)
-	}
-
-	cancel()
-	_, err = client.Do(req)
-
-	if called != 1 {
-		t.Fatalf("CheckRetry called %d times, expected 1", called)
-	}
-
-	if err != context.Canceled {
-		t.Fatalf("Expected context.Canceled err, got: %v", err)
-	}
-}
-
 func TestClient_CheckRetry(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "test_500_body", http.StatusInternalServerError)
@@ -409,10 +330,10 @@ func TestClient_CheckRetry(t *testing.T) {
 
 	retryErr := errors.New("retryError")
 	called := 0
-	client.CheckRetry = func(_ context.Context, resp *http.Response, err error) (bool, error) {
+	client.CheckRetry = func(resp *http.Response, err error) (bool, error) {
 		if called < 1 {
 			called++
-			return DefaultRetryPolicy(context.TODO(), resp, err)
+			return DefaultRetryPolicy(resp, err)
 		}
 
 		return false, retryErr
@@ -440,7 +361,7 @@ func TestClient_CheckRetryStop(t *testing.T) {
 
 	// Verify that this stops retries on the first try, with no errors from the client.
 	called := 0
-	client.CheckRetry = func(_ context.Context, resp *http.Response, err error) (bool, error) {
+	client.CheckRetry = func(resp *http.Response, err error) (bool, error) {
 		called++
 		return false, nil
 	}

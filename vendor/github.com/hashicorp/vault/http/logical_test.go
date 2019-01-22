@@ -13,12 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-test/deep"
 	log "github.com/hashicorp/go-hclog"
 
-	"github.com/hashicorp/vault/helper/consts"
 	"github.com/hashicorp/vault/helper/logging"
-	"github.com/hashicorp/vault/helper/namespace"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/physical"
 	"github.com/hashicorp/vault/physical/inmem"
@@ -59,8 +56,8 @@ func TestLogical(t *testing.T) {
 	testResponseBody(t, resp, &actual)
 	delete(actual, "lease_id")
 	expected["request_id"] = actual["request_id"]
-	if diff := deep.Equal(actual, expected); diff != nil {
-		t.Fatal(diff)
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("bad:\nactual:\n%#v\nexpected:\n%#v", actual, expected)
 	}
 
 	// DELETE
@@ -164,7 +161,6 @@ func TestLogical_StandbyRedirect(t *testing.T) {
 			"explicit_max_ttl": json.Number("0"),
 			"expire_time":      nil,
 			"entity_id":        "",
-			"type":             "service",
 		},
 		"warnings":  nilWarnings,
 		"wrap_info": nil,
@@ -179,8 +175,8 @@ func TestLogical_StandbyRedirect(t *testing.T) {
 	actual["data"] = actualDataMap
 	expected["request_id"] = actual["request_id"]
 	delete(actual, "lease_id")
-	if diff := deep.Equal(actual, expected); diff != nil {
-		t.Fatal(diff)
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("bad: got %#v; expected %#v", actual, expected)
 	}
 
 	//// DELETE to standby
@@ -211,12 +207,10 @@ func TestLogical_CreateToken(t *testing.T) {
 		"wrap_info":      nil,
 		"auth": map[string]interface{}{
 			"policies":       []interface{}{"root"},
-			"token_policies": []interface{}{"root"},
 			"metadata":       nil,
 			"lease_duration": json.Number("0"),
 			"renewable":      false,
 			"entity_id":      "",
-			"token_type":     "service",
 		},
 		"warnings": nilWarnings,
 	}
@@ -266,16 +260,14 @@ func TestLogical_RequestSizeLimit(t *testing.T) {
 
 	// Write a very large object, should fail
 	resp := testHttpPut(t, token, addr+"/v1/secret/foo", map[string]interface{}{
-		"data": make([]byte, DefaultMaxRequestSize),
+		"data": make([]byte, MaxRequestSize),
 	})
 	testResponseStatus(t, resp, 413)
 }
 
 func TestLogical_ListSuffix(t *testing.T) {
-	core, _, rootToken := vault.TestCoreUnsealed(t)
+	core, _, _ := vault.TestCoreUnsealed(t)
 	req, _ := http.NewRequest("GET", "http://127.0.0.1:8200/v1/secret/foo", nil)
-	req = req.WithContext(namespace.RootContext(nil))
-	req.Header.Add(consts.AuthHeaderName, rootToken)
 	lreq, status, err := buildLogicalRequest(core, nil, req)
 	if err != nil {
 		t.Fatal(err)
@@ -288,8 +280,6 @@ func TestLogical_ListSuffix(t *testing.T) {
 	}
 
 	req, _ = http.NewRequest("GET", "http://127.0.0.1:8200/v1/secret/foo?list=true", nil)
-	req = req.WithContext(namespace.RootContext(nil))
-	req.Header.Add(consts.AuthHeaderName, rootToken)
 	lreq, status, err = buildLogicalRequest(core, nil, req)
 	if err != nil {
 		t.Fatal(err)
@@ -302,8 +292,6 @@ func TestLogical_ListSuffix(t *testing.T) {
 	}
 
 	req, _ = http.NewRequest("LIST", "http://127.0.0.1:8200/v1/secret/foo", nil)
-	req = req.WithContext(namespace.RootContext(nil))
-	req.Header.Add(consts.AuthHeaderName, rootToken)
 	lreq, status, err = buildLogicalRequest(core, nil, req)
 	if err != nil {
 		t.Fatal(err)
@@ -329,7 +317,7 @@ func TestLogical_RespondWithStatusCode(t *testing.T) {
 	}
 
 	w := httptest.NewRecorder()
-	respondLogical(w, nil, nil, resp404, false)
+	respondLogical(w, nil, nil, false, resp404)
 
 	if w.Code != 404 {
 		t.Fatalf("Bad Status code: %d", w.Code)

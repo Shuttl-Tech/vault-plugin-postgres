@@ -125,10 +125,7 @@ func TestAESGCMBarrier_BackwardsCompatible(t *testing.T) {
 	// Protect with master key
 	master, _ := b.GenerateKey()
 	gcm, _ := b.aeadFromKey(master)
-	value, err := b.encrypt(barrierInitPath, initialKeyTerm, gcm, buf)
-	if err != nil {
-		t.Fatal(err)
-	}
+	value := b.encrypt(barrierInitPath, initialKeyTerm, gcm, buf)
 
 	// Write to the physical backend
 	pe := &physical.Entry{
@@ -139,13 +136,9 @@ func TestAESGCMBarrier_BackwardsCompatible(t *testing.T) {
 
 	// Create a fake key
 	gcm, _ = b.aeadFromKey(encrypt)
-	value, err = b.encrypt("test/foo", initialKeyTerm, gcm, []byte("test"))
-	if err != nil {
-		t.Fatal(err)
-	}
 	pe = &physical.Entry{
 		Key:   "test/foo",
-		Value: value,
+		Value: b.encrypt("test/foo", initialKeyTerm, gcm, []byte("test")),
 	}
 	inm.Put(context.Background(), pe)
 
@@ -436,14 +429,8 @@ func TestEncrypt_Unique(t *testing.T) {
 	term := b.keyring.ActiveTerm()
 	primary, _ := b.aeadForTerm(term)
 
-	first, err := b.encrypt("test", term, primary, entry.Value)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := b.encrypt("test", term, primary, entry.Value)
-	if err != nil {
-		t.Fatal(err)
-	}
+	first := b.encrypt("test", term, primary, entry.Value)
+	second := b.encrypt("test", term, primary, entry.Value)
 
 	if bytes.Equal(first, second) == true {
 		t.Fatalf("improper random seeding detected")

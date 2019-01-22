@@ -57,12 +57,9 @@ func NewTransactionalLatencyInjector(b Backend, latency time.Duration, jitter in
 
 func (l *LatencyInjector) addLatency() {
 	// Calculate a value between 1 +- jitter%
-	percent := 100
-	if l.jitterPercent > 0 {
-		min := 100 - l.jitterPercent
-		max := 100 + l.jitterPercent
-		percent = l.random.Intn(max-min) + min
-	}
+	min := 100 - l.jitterPercent
+	max := 100 + l.jitterPercent
+	percent := l.random.Intn(max-min) + min
 	latencyDuration := time.Duration(int(l.latency) * percent / 100)
 	time.Sleep(latencyDuration)
 }

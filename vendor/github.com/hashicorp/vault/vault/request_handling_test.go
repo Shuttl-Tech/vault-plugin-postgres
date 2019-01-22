@@ -1,12 +1,12 @@
 package vault
 
 import (
+	"context"
 	"testing"
 	"time"
 
-	uuid "github.com/hashicorp/go-uuid"
+	"github.com/hashicorp/go-uuid"
 	credUserpass "github.com/hashicorp/vault/builtin/credential/userpass"
-	"github.com/hashicorp/vault/helper/namespace"
 	"github.com/hashicorp/vault/logical"
 )
 
@@ -16,7 +16,7 @@ func TestRequestHandling_Wrapping(t *testing.T) {
 	core.logicalBackends["kv"] = PassthroughBackendFactory
 
 	meUUID, _ := uuid.GenerateUUID()
-	err := core.mount(namespace.RootContext(nil), &MountEntry{
+	err := core.mount(context.Background(), &MountEntry{
 		Table: mountTableType,
 		UUID:  meUUID,
 		Path:  "wraptest",
@@ -35,7 +35,7 @@ func TestRequestHandling_Wrapping(t *testing.T) {
 			"zip": "zap",
 		},
 	}
-	resp, err := core.HandleRequest(namespace.RootContext(nil), req)
+	resp, err := core.HandleRequest(req)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestRequestHandling_Wrapping(t *testing.T) {
 			TTL: time.Duration(15 * time.Second),
 		},
 	}
-	resp, err = core.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = core.HandleRequest(req)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestRequestHandling_Wrapping(t *testing.T) {
 func TestRequestHandling_LoginWrapping(t *testing.T) {
 	core, _, root := TestCoreUnsealed(t)
 
-	if err := core.loadMounts(namespace.RootContext(nil)); err != nil {
+	if err := core.loadMounts(context.Background()); err != nil {
 		t.Fatalf("err: %v", err)
 	}
 
@@ -80,9 +80,8 @@ func TestRequestHandling_LoginWrapping(t *testing.T) {
 		Data: map[string]interface{}{
 			"type": "userpass",
 		},
-		Connection: &logical.Connection{},
 	}
-	resp, err := core.HandleRequest(namespace.RootContext(nil), req)
+	resp, err := core.HandleRequest(req)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -95,7 +94,7 @@ func TestRequestHandling_LoginWrapping(t *testing.T) {
 		"password": "foo",
 		"policies": "default",
 	}
-	resp, err = core.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = core.HandleRequest(req)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -109,9 +108,8 @@ func TestRequestHandling_LoginWrapping(t *testing.T) {
 		Data: map[string]interface{}{
 			"password": "foo",
 		},
-		Connection: &logical.Connection{},
 	}
-	resp, err = core.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = core.HandleRequest(req)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -131,9 +129,8 @@ func TestRequestHandling_LoginWrapping(t *testing.T) {
 		Data: map[string]interface{}{
 			"password": "foo",
 		},
-		Connection: &logical.Connection{},
 	}
-	resp, err = core.HandleRequest(namespace.RootContext(nil), req)
+	resp, err = core.HandleRequest(req)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
