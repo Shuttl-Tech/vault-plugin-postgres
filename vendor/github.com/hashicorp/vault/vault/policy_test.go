@@ -5,8 +5,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/hashicorp/vault/helper/namespace"
 )
 
 var rawPolicy = strings.TrimSpace(`
@@ -91,14 +89,10 @@ path "test/req" {
 	capabilities = ["create", "sudo"]
 	required_parameters = ["foo"]
 }
-path "test/mfa" {
-	capabilities = ["create", "sudo"]
-	mfa_methods = ["my_totp", "my_totp2"]
-}
 `)
 
 func TestPolicy_Parse(t *testing.T) {
-	p, err := ParseACLPolicy(namespace.RootNamespace, rawPolicy)
+	p, err := ParseACLPolicy(rawPolicy)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -249,35 +243,14 @@ func TestPolicy_Parse(t *testing.T) {
 			},
 			Glob: false,
 		},
-		&PathRules{
-			Prefix: "test/mfa",
-			Policy: "",
-			Capabilities: []string{
-				"create",
-				"sudo",
-			},
-			MFAMethodsHCL: []string{
-				"my_totp",
-				"my_totp2",
-			},
-			Permissions: &ACLPermissions{
-				CapabilitiesBitmap: (CreateCapabilityInt | SudoCapabilityInt),
-				MFAMethods: []string{
-					"my_totp",
-					"my_totp2",
-				},
-			},
-			Glob: false,
-		},
 	}
-
 	if !reflect.DeepEqual(p.Paths, expect) {
 		t.Errorf("expected \n\n%#v\n\n to be \n\n%#v\n\n", p.Paths, expect)
 	}
 }
 
 func TestPolicy_ParseBadRoot(t *testing.T) {
-	_, err := ParseACLPolicy(namespace.RootNamespace, strings.TrimSpace(`
+	_, err := ParseACLPolicy(strings.TrimSpace(`
 name = "test"
 bad  = "foo"
 nope = "yes"
@@ -296,8 +269,7 @@ nope = "yes"
 }
 
 func TestPolicy_ParseBadPath(t *testing.T) {
-	// The wrong spelling is intended here
-	_, err := ParseACLPolicy(namespace.RootNamespace, strings.TrimSpace(`
+	_, err := ParseACLPolicy(strings.TrimSpace(`
 path "/" {
 	capabilities = ["read"]
 	capabilites  = ["read"]
@@ -313,7 +285,7 @@ path "/" {
 }
 
 func TestPolicy_ParseBadPolicy(t *testing.T) {
-	_, err := ParseACLPolicy(namespace.RootNamespace, strings.TrimSpace(`
+	_, err := ParseACLPolicy(strings.TrimSpace(`
 path "/" {
 	policy = "banana"
 }
@@ -328,7 +300,7 @@ path "/" {
 }
 
 func TestPolicy_ParseBadWrapping(t *testing.T) {
-	_, err := ParseACLPolicy(namespace.RootNamespace, strings.TrimSpace(`
+	_, err := ParseACLPolicy(strings.TrimSpace(`
 path "/" {
 	policy = "read"
 	min_wrapping_ttl = 400
@@ -345,7 +317,7 @@ path "/" {
 }
 
 func TestPolicy_ParseBadCapabilities(t *testing.T) {
-	_, err := ParseACLPolicy(namespace.RootNamespace, strings.TrimSpace(`
+	_, err := ParseACLPolicy(strings.TrimSpace(`
 path "/" {
 	capabilities = ["read", "banana"]
 }

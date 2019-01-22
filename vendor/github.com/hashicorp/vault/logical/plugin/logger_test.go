@@ -8,7 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	hclog "github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-hclog"
+
 	plugin "github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/vault/helper/logging"
 )

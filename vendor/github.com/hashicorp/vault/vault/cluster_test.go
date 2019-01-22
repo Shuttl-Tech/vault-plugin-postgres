@@ -70,7 +70,11 @@ func TestClusterHAFetching(t *testing.T) {
 	}
 
 	// Verify unsealed
-	if c.Sealed() {
+	sealed, err := c.Sealed()
+	if err != nil {
+		t.Fatalf("err checking seal status: %s", err)
+	}
+	if sealed {
 		t.Fatal("should not be sealed")
 	}
 
@@ -104,7 +108,7 @@ func TestCluster_ListenForRequests(t *testing.T) {
 	// Use this to have a valid config after sealing since ClusterTLSConfig returns nil
 	var lastTLSConfig *tls.Config
 	checkListenersFunc := func(expectFail bool) {
-		tlsConfig, err := cores[0].ClusterTLSConfig(context.Background(), nil, nil)
+		tlsConfig, err := cores[0].ClusterTLSConfig(context.Background(), nil)
 		if err != nil {
 			if err.Error() != consts.ErrSealed.Error() {
 				t.Fatal(err)
@@ -150,7 +154,7 @@ func TestCluster_ListenForRequests(t *testing.T) {
 	time.Sleep(clusterTestPausePeriod)
 	checkListenersFunc(false)
 
-	err := cores[0].StepDown(context.Background(), &logical.Request{
+	err := cores[0].StepDown(&logical.Request{
 		Operation:   logical.UpdateOperation,
 		Path:        "sys/step-down",
 		ClientToken: cluster.RootToken,
@@ -222,7 +226,7 @@ func testCluster_ForwardRequestsCommon(t *testing.T) {
 	//
 
 	// Ensure active core is cores[1] and test
-	err := cores[0].StepDown(context.Background(), &logical.Request{
+	err := cores[0].StepDown(&logical.Request{
 		Operation:   logical.UpdateOperation,
 		Path:        "sys/step-down",
 		ClientToken: root,
@@ -231,7 +235,7 @@ func testCluster_ForwardRequestsCommon(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(clusterTestPausePeriod)
-	_ = cores[2].StepDown(context.Background(), &logical.Request{
+	_ = cores[2].StepDown(&logical.Request{
 		Operation:   logical.UpdateOperation,
 		Path:        "sys/step-down",
 		ClientToken: root,
@@ -242,7 +246,7 @@ func testCluster_ForwardRequestsCommon(t *testing.T) {
 	testCluster_ForwardRequests(t, cores[2], root, "core2")
 
 	// Ensure active core is cores[2] and test
-	err = cores[1].StepDown(context.Background(), &logical.Request{
+	err = cores[1].StepDown(&logical.Request{
 		Operation:   logical.UpdateOperation,
 		Path:        "sys/step-down",
 		ClientToken: root,
@@ -251,7 +255,7 @@ func testCluster_ForwardRequestsCommon(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(clusterTestPausePeriod)
-	_ = cores[0].StepDown(context.Background(), &logical.Request{
+	_ = cores[0].StepDown(&logical.Request{
 		Operation:   logical.UpdateOperation,
 		Path:        "sys/step-down",
 		ClientToken: root,
@@ -262,7 +266,7 @@ func testCluster_ForwardRequestsCommon(t *testing.T) {
 	testCluster_ForwardRequests(t, cores[1], root, "core3")
 
 	// Ensure active core is cores[0] and test
-	err = cores[2].StepDown(context.Background(), &logical.Request{
+	err = cores[2].StepDown(&logical.Request{
 		Operation:   logical.UpdateOperation,
 		Path:        "sys/step-down",
 		ClientToken: root,
@@ -271,7 +275,7 @@ func testCluster_ForwardRequestsCommon(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(clusterTestPausePeriod)
-	_ = cores[1].StepDown(context.Background(), &logical.Request{
+	_ = cores[1].StepDown(&logical.Request{
 		Operation:   logical.UpdateOperation,
 		Path:        "sys/step-down",
 		ClientToken: root,
@@ -282,7 +286,7 @@ func testCluster_ForwardRequestsCommon(t *testing.T) {
 	testCluster_ForwardRequests(t, cores[2], root, "core1")
 
 	// Ensure active core is cores[1] and test
-	err = cores[0].StepDown(context.Background(), &logical.Request{
+	err = cores[0].StepDown(&logical.Request{
 		Operation:   logical.UpdateOperation,
 		Path:        "sys/step-down",
 		ClientToken: root,
@@ -291,7 +295,7 @@ func testCluster_ForwardRequestsCommon(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(clusterTestPausePeriod)
-	_ = cores[2].StepDown(context.Background(), &logical.Request{
+	_ = cores[2].StepDown(&logical.Request{
 		Operation:   logical.UpdateOperation,
 		Path:        "sys/step-down",
 		ClientToken: root,
@@ -302,7 +306,7 @@ func testCluster_ForwardRequestsCommon(t *testing.T) {
 	testCluster_ForwardRequests(t, cores[2], root, "core2")
 
 	// Ensure active core is cores[2] and test
-	err = cores[1].StepDown(context.Background(), &logical.Request{
+	err = cores[1].StepDown(&logical.Request{
 		Operation:   logical.UpdateOperation,
 		Path:        "sys/step-down",
 		ClientToken: root,
@@ -311,7 +315,7 @@ func testCluster_ForwardRequestsCommon(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(clusterTestPausePeriod)
-	_ = cores[0].StepDown(context.Background(), &logical.Request{
+	_ = cores[0].StepDown(&logical.Request{
 		Operation:   logical.UpdateOperation,
 		Path:        "sys/step-down",
 		ClientToken: root,
@@ -345,8 +349,7 @@ func testCluster_ForwardRequests(t *testing.T, c *TestClusterCore, rootToken, re
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Add(consts.AuthHeaderName, rootToken)
-	req = req.WithContext(context.WithValue(req.Context(), "original_request_path", req.URL.Path))
+	req.Header.Add("X-Vault-Token", rootToken)
 
 	statusCode, header, respBytes, err := c.ForwardRequest(req)
 	if err != nil {
@@ -392,7 +395,7 @@ func TestCluster_CustomCipherSuites(t *testing.T) {
 	// Wait for core to become active
 	TestWaitActive(t, core.Core)
 
-	tlsConf, err := core.Core.ClusterTLSConfig(context.Background(), nil, nil)
+	tlsConf, err := core.Core.ClusterTLSConfig(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

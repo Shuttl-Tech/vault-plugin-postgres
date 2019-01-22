@@ -6,7 +6,7 @@ import (
 	"net/rpc"
 
 	log "github.com/hashicorp/go-hclog"
-	plugin "github.com/hashicorp/go-plugin"
+	"github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/vault/logical"
 )
 

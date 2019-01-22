@@ -19,7 +19,6 @@
 package grpc
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"math"
@@ -30,9 +29,11 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/internal/transport"
 	"google.golang.org/grpc/status"
+	"google.golang.org/grpc/test/leakcheck"
+	"google.golang.org/grpc/transport"
 )
 
 var (
@@ -104,13 +105,12 @@ func (h *testStreamHandler) handleStream(t *testing.T, s *transport.Stream) {
 		}
 	}
 	// send a response back to end the stream.
-	data, err := encode(testCodec{}, &expectedResponse)
+	hdr, data, err := encode(testCodec{}, &expectedResponse, nil, nil, nil)
 	if err != nil {
 		t.Errorf("Failed to encode the response: %v", err)
 		return
 	}
-	hdr, payload := msgHeader(data, nil)
-	h.t.Write(s, hdr, payload, &transport.Options{})
+	h.t.Write(s, hdr, data, &transport.Options{})
 	h.t.WriteStatus(s, status.New(codes.OK, ""))
 }
 
@@ -213,7 +213,8 @@ func setUp(t *testing.T, port int, maxStreams uint32) (*server, *ClientConn) {
 	return server, cc
 }
 
-func (s) TestInvoke(t *testing.T) {
+func TestInvoke(t *testing.T) {
+	defer leakcheck.Check(t)
 	server, cc := setUp(t, 0, math.MaxUint32)
 	var reply string
 	if err := cc.Invoke(context.Background(), "/foo/bar", &expectedRequest, &reply); err != nil || reply != expectedResponse {
@@ -223,7 +224,8 @@ func (s) TestInvoke(t *testing.T) {
 	server.stop()
 }
 
-func (s) TestInvokeLargeErr(t *testing.T) {
+func TestInvokeLargeErr(t *testing.T) {
+	defer leakcheck.Check(t)
 	server, cc := setUp(t, 0, math.MaxUint32)
 	var reply string
 	req := "hello"
@@ -239,7 +241,8 @@ func (s) TestInvokeLargeErr(t *testing.T) {
 }
 
 // TestInvokeErrorSpecialChars checks that error messages don't get mangled.
-func (s) TestInvokeErrorSpecialChars(t *testing.T) {
+func TestInvokeErrorSpecialChars(t *testing.T) {
+	defer leakcheck.Check(t)
 	server, cc := setUp(t, 0, math.MaxUint32)
 	var reply string
 	req := "weird error"
@@ -255,7 +258,8 @@ func (s) TestInvokeErrorSpecialChars(t *testing.T) {
 }
 
 // TestInvokeCancel checks that an Invoke with a canceled context is not sent.
-func (s) TestInvokeCancel(t *testing.T) {
+func TestInvokeCancel(t *testing.T) {
+	defer leakcheck.Check(t)
 	server, cc := setUp(t, 0, math.MaxUint32)
 	var reply string
 	req := "canceled"
@@ -273,14 +277,15 @@ func (s) TestInvokeCancel(t *testing.T) {
 
 // TestInvokeCancelClosedNonFail checks that a canceled non-failfast RPC
 // on a closed client will terminate.
-func (s) TestInvokeCancelClosedNonFailFast(t *testing.T) {
+func TestInvokeCancelClosedNonFailFast(t *testing.T) {
+	defer leakcheck.Check(t)
 	server, cc := setUp(t, 0, math.MaxUint32)
 	var reply string
 	cc.Close()
 	req := "hello"
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := cc.Invoke(ctx, "/foo/bar", &req, &reply, WaitForReady(true)); err == nil {
+	if err := cc.Invoke(ctx, "/foo/bar", &req, &reply, FailFast(false)); err == nil {
 		t.Fatalf("canceled invoke on closed connection should fail")
 	}
 	server.stop()

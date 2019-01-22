@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/vault/builtin/logical/database/dbplugin"
-	"github.com/hashicorp/vault/helper/strutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 )
@@ -75,27 +74,14 @@ func pathRoles(b *databaseBackend) *framework.Path {
 			},
 		},
 
-		ExistenceCheck: b.pathRoleExistenceCheck(),
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.ReadOperation:   b.pathRoleRead(),
-			logical.CreateOperation: b.pathRoleCreateUpdate(),
-			logical.UpdateOperation: b.pathRoleCreateUpdate(),
+			logical.UpdateOperation: b.pathRoleCreate(),
 			logical.DeleteOperation: b.pathRoleDelete(),
 		},
 
 		HelpSynopsis:    pathRoleHelpSyn,
 		HelpDescription: pathRoleHelpDesc,
-	}
-}
-
-func (b *databaseBackend) pathRoleExistenceCheck() framework.ExistenceFunc {
-	return func(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {
-		role, err := b.Role(ctx, req.Storage, data.Get("name").(string))
-		if err != nil {
-			return false, err
-		}
-
-		return role != nil, nil
 	}
 }
 
@@ -111,8 +97,8 @@ func (b *databaseBackend) pathRoleDelete() framework.OperationFunc {
 }
 
 func (b *databaseBackend) pathRoleRead() framework.OperationFunc {
-	return func(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-		role, err := b.Role(ctx, req.Storage, d.Get("name").(string))
+	return func(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+		role, err := b.Role(ctx, req.Storage, data.Get("name").(string))
 		if err != nil {
 			return nil, err
 		}
@@ -120,30 +106,16 @@ func (b *databaseBackend) pathRoleRead() framework.OperationFunc {
 			return nil, nil
 		}
 
-		data := map[string]interface{}{
-			"db_name":               role.DBName,
-			"creation_statements":   role.Statements.Creation,
-			"revocation_statements": role.Statements.Revocation,
-			"rollback_statements":   role.Statements.Rollback,
-			"renew_statements":      role.Statements.Renewal,
-			"default_ttl":           role.DefaultTTL.Seconds(),
-			"max_ttl":               role.MaxTTL.Seconds(),
-		}
-		if len(role.Statements.Creation) == 0 {
-			data["creation_statements"] = []string{}
-		}
-		if len(role.Statements.Revocation) == 0 {
-			data["revocation_statements"] = []string{}
-		}
-		if len(role.Statements.Rollback) == 0 {
-			data["rollback_statements"] = []string{}
-		}
-		if len(role.Statements.Renewal) == 0 {
-			data["renew_statements"] = []string{}
-		}
-
 		return &logical.Response{
-			Data: data,
+			Data: map[string]interface{}{
+				"db_name":               role.DBName,
+				"creation_statements":   role.Statements.Creation,
+				"revocation_statements": role.Statements.Revocation,
+				"rollback_statements":   role.Statements.Rollback,
+				"renew_statements":      role.Statements.Renewal,
+				"default_ttl":           role.DefaultTTL.Seconds(),
+				"max_ttl":               role.MaxTTL.Seconds(),
+			},
 		}, nil
 	}
 }
@@ -159,84 +131,44 @@ func (b *databaseBackend) pathRoleList() framework.OperationFunc {
 	}
 }
 
-func (b *databaseBackend) pathRoleCreateUpdate() framework.OperationFunc {
+func (b *databaseBackend) pathRoleCreate() framework.OperationFunc {
 	return func(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 		name := data.Get("name").(string)
 		if name == "" {
 			return logical.ErrorResponse("empty role name attribute given"), nil
 		}
 
-		role, err := b.Role(ctx, req.Storage, data.Get("name").(string))
-		if err != nil {
-			return nil, err
-		}
-		if role == nil {
-			role = &roleEntry{}
+		dbName := data.Get("db_name").(string)
+		if dbName == "" {
+			return logical.ErrorResponse("empty database name attribute given"), nil
 		}
 
-		// DB Attributes
-		{
-			if dbNameRaw, ok := data.GetOk("db_name"); ok {
-				role.DBName = dbNameRaw.(string)
-			} else if req.Operation == logical.CreateOperation {
-				role.DBName = data.Get("db_name").(string)
-			}
-			if role.DBName == "" {
-				return logical.ErrorResponse("empty database name attribute"), nil
-			}
+		// Get statements
+		creationStmts := data.Get("creation_statements").([]string)
+		revocationStmts := data.Get("revocation_statements").([]string)
+		rollbackStmts := data.Get("rollback_statements").([]string)
+		renewStmts := data.Get("renew_statements").([]string)
+
+		// Get TTLs
+		defaultTTLRaw := data.Get("default_ttl").(int)
+		maxTTLRaw := data.Get("max_ttl").(int)
+		defaultTTL := time.Duration(defaultTTLRaw) * time.Second
+		maxTTL := time.Duration(maxTTLRaw) * time.Second
+
+		statements := dbplugin.Statements{
+			Creation:   creationStmts,
+			Revocation: revocationStmts,
+			Rollback:   rollbackStmts,
+			Renewal:    renewStmts,
 		}
-
-		// TTLs
-		{
-			if defaultTTLRaw, ok := data.GetOk("default_ttl"); ok {
-				role.DefaultTTL = time.Duration(defaultTTLRaw.(int)) * time.Second
-			} else if req.Operation == logical.CreateOperation {
-				role.DefaultTTL = time.Duration(data.Get("default_ttl").(int)) * time.Second
-			}
-			if maxTTLRaw, ok := data.GetOk("max_ttl"); ok {
-				role.MaxTTL = time.Duration(maxTTLRaw.(int)) * time.Second
-			} else if req.Operation == logical.CreateOperation {
-				role.MaxTTL = time.Duration(data.Get("max_ttl").(int)) * time.Second
-			}
-		}
-
-		// Statements
-		{
-			if creationStmtsRaw, ok := data.GetOk("creation_statements"); ok {
-				role.Statements.Creation = creationStmtsRaw.([]string)
-			} else if req.Operation == logical.CreateOperation {
-				role.Statements.Creation = data.Get("creation_statements").([]string)
-			}
-
-			if revocationStmtsRaw, ok := data.GetOk("revocation_statements"); ok {
-				role.Statements.Revocation = revocationStmtsRaw.([]string)
-			} else if req.Operation == logical.CreateOperation {
-				role.Statements.Revocation = data.Get("revocation_statements").([]string)
-			}
-
-			if rollbackStmtsRaw, ok := data.GetOk("rollback_statements"); ok {
-				role.Statements.Rollback = rollbackStmtsRaw.([]string)
-			} else if req.Operation == logical.CreateOperation {
-				role.Statements.Rollback = data.Get("rollback_statements").([]string)
-			}
-
-			if renewStmtsRaw, ok := data.GetOk("renew_statements"); ok {
-				role.Statements.Renewal = renewStmtsRaw.([]string)
-			} else if req.Operation == logical.CreateOperation {
-				role.Statements.Renewal = data.Get("renew_statements").([]string)
-			}
-
-			// Do not persist deprecated statements that are populated on role read
-			role.Statements.CreationStatements = ""
-			role.Statements.RevocationStatements = ""
-			role.Statements.RenewStatements = ""
-			role.Statements.RollbackStatements = ""
-		}
-
-		role.Statements.Revocation = strutil.RemoveEmpty(role.Statements.Revocation)
 
 		// Store it
-		entry, err := logical.StorageEntryJSON("role/"+name, role)
+		entry, err := logical.StorageEntryJSON("role/"+name, &roleEntry{
+			DBName:     dbName,
+			Statements: statements,
+			DefaultTTL: defaultTTL,
+			MaxTTL:     maxTTL,
+		})
 		if err != nil {
 			return nil, err
 		}

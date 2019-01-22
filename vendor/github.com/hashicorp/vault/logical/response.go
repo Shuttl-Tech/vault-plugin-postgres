@@ -89,12 +89,11 @@ func (r *Response) Error() error {
 }
 
 // HelpResponse is used to format a help response
-func HelpResponse(text string, seeAlso []string, oapiDoc interface{}) *Response {
+func HelpResponse(text string, seeAlso []string) *Response {
 	return &Response{
 		Data: map[string]interface{}{
 			"help":     text,
 			"see_also": seeAlso,
-			"openapi":  oapiDoc,
 		},
 	}
 }
@@ -142,30 +141,22 @@ func ListResponseWithInfo(keys []string, keyInfo map[string]interface{}) *Respon
 // RespondWithStatusCode takes a response and converts it to a raw response with
 // the provided Status Code.
 func RespondWithStatusCode(resp *Response, req *Request, code int) (*Response, error) {
-	ret := &Response{
+	httpResp := LogicalResponseToHTTPResponse(resp)
+	httpResp.RequestID = req.ID
+
+	body, err := json.Marshal(httpResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Response{
 		Data: map[string]interface{}{
 			HTTPContentType: "application/json",
-			HTTPStatusCode:  code,
+			// We default to string here so that the value is HMAC'd via audit.
+			// Since this function is always marshaling to JSON, this is
+			// appropriate.
+			HTTPRawBody:    string(body),
+			HTTPStatusCode: code,
 		},
-	}
-
-	if resp != nil {
-		httpResp := LogicalResponseToHTTPResponse(resp)
-
-		if req != nil {
-			httpResp.RequestID = req.ID
-		}
-
-		body, err := json.Marshal(httpResp)
-		if err != nil {
-			return nil, err
-		}
-
-		// We default to string here so that the value is HMAC'd via audit.
-		// Since this function is always marshaling to JSON, this is
-		// appropriate.
-		ret.Data[HTTPRawBody] = string(body)
-	}
-
-	return ret, nil
+	}, nil
 }

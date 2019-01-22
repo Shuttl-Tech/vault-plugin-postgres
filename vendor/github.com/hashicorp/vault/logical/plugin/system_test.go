@@ -150,7 +150,7 @@ func TestSystem_lookupPlugin(t *testing.T) {
 
 	testSystemView := &SystemViewClient{client: client}
 
-	if _, err := testSystemView.LookupPlugin(context.Background(), "foo", consts.PluginTypeDatabase); err == nil {
+	if _, err := testSystemView.LookupPlugin(context.Background(), "foo"); err == nil {
 		t.Fatal("LookPlugin(): expected error on due to unsupported call from plugin")
 	}
 }
@@ -170,61 +170,6 @@ func TestSystem_mlockEnabled(t *testing.T) {
 
 	expected := sys.MlockEnabled()
 	actual := testSystemView.MlockEnabled()
-	if !reflect.DeepEqual(expected, actual) {
-		t.Fatalf("expected: %v, got: %v", expected, actual)
-	}
-}
-
-func TestSystem_entityInfo(t *testing.T) {
-	client, server := plugin.TestRPCConn(t)
-	defer client.Close()
-
-	sys := logical.TestSystemView()
-	sys.EntityVal = &logical.Entity{
-		ID:   "test",
-		Name: "name",
-	}
-
-	server.RegisterName("Plugin", &SystemViewServer{
-		impl: sys,
-	})
-
-	testSystemView := &SystemViewClient{client: client}
-
-	actual, err := testSystemView.EntityInfo("")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(sys.EntityVal, actual) {
-		t.Fatalf("expected: %v, got: %v", sys.EntityVal, actual)
-	}
-}
-
-func TestSystem_pluginEnv(t *testing.T) {
-	client, server := plugin.TestRPCConn(t)
-	defer client.Close()
-
-	sys := logical.TestSystemView()
-	sys.PluginEnvironment = &logical.PluginEnvironment{
-		VaultVersion: "0.10.42",
-	}
-
-	server.RegisterName("Plugin", &SystemViewServer{
-		impl: sys,
-	})
-
-	testSystemView := &SystemViewClient{client: client}
-
-	expected, err := sys.PluginEnv(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	actual, err := testSystemView.PluginEnv(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	if !reflect.DeepEqual(expected, actual) {
 		t.Fatalf("expected: %v, got: %v", expected, actual)
 	}

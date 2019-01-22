@@ -141,14 +141,12 @@ func testGRPCBackend(t *testing.T) (logical.Backend, func()) {
 	// Create a mock provider
 	pluginMap := map[string]gplugin.Plugin{
 		"backend": &BackendPlugin{
-			GRPCBackendPlugin: &GRPCBackendPlugin{
-				Factory: mock.Factory,
-				Logger: log.New(&log.LoggerOptions{
-					Level:      log.Debug,
-					Output:     os.Stderr,
-					JSONFormat: true,
-				}),
-			},
+			Factory: mock.Factory,
+			Logger: log.New(&log.LoggerOptions{
+				Level:      log.Debug,
+				Output:     os.Stderr,
+				JSONFormat: true,
+			}),
 		},
 	}
 	client, _ := gplugin.TestPluginGRPCConn(t, pluginMap)

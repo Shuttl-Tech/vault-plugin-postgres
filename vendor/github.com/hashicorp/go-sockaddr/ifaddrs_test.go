@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"reflect"
-	"runtime"
 	"testing"
 
 	sockaddr "github.com/hashicorp/go-sockaddr"
@@ -1657,12 +1656,11 @@ func TestLimitOffset(t *testing.T) {
 
 func TestSortIfBy(t *testing.T) {
 	tests := []struct {
-		name     string
-		sortStr  string
-		in       sockaddr.IfAddrs
-		out      sockaddr.IfAddrs
-		fail     bool
-		skipWhen func() bool
+		name    string
+		sortStr string
+		in      sockaddr.IfAddrs
+		out     sockaddr.IfAddrs
+		fail    bool
 	}{
 		{
 			name:    "sort address",
@@ -1731,9 +1729,6 @@ func TestSortIfBy(t *testing.T) {
 			// en0 has the default route.
 			name:    "sort +default",
 			sortStr: "+default",
-			skipWhen: func() bool {
-				return runtime.GOOS != "darwin"
-			},
 			in: sockaddr.IfAddrs{
 				sockaddr.IfAddr{
 					SockAddr:  sockaddr.MustIPv4Addr("1.2.3.4"),
@@ -1758,9 +1753,6 @@ func TestSortIfBy(t *testing.T) {
 		{
 			name:    "sort -default",
 			sortStr: "-default",
-			skipWhen: func() bool {
-				return runtime.GOOS != "darwin"
-			},
 			in: sockaddr.IfAddrs{
 				sockaddr.IfAddr{
 					SockAddr:  sockaddr.MustIPv4Addr("1.2.3.3"),
@@ -1972,10 +1964,6 @@ func TestSortIfBy(t *testing.T) {
 	for i, test := range tests {
 		if test.name == "" {
 			t.Fatalf("test %d needs a name", i)
-		}
-		if test.skipWhen != nil && test.skipWhen() {
-			t.SkipNow()
-			continue
 		}
 
 		t.Run(test.name, func(t *testing.T) {

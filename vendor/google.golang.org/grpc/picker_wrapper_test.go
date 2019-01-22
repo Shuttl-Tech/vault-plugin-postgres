@@ -19,16 +19,17 @@
 package grpc
 
 import (
-	"context"
 	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/connectivity"
 	_ "google.golang.org/grpc/grpclog/glogger"
-	"google.golang.org/grpc/internal/transport"
+	"google.golang.org/grpc/test/leakcheck"
+	"google.golang.org/grpc/transport"
 )
 
 const goroutineCount = 5
@@ -64,7 +65,8 @@ func (p *testingPicker) Pick(ctx context.Context, opts balancer.PickOptions) (ba
 	return p.sc, nil, nil
 }
 
-func (s) TestBlockingPickTimeout(t *testing.T) {
+func TestBlockingPickTimeout(t *testing.T) {
+	defer leakcheck.Check(t)
 	bp := newPickerWrapper()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancel()
@@ -73,7 +75,8 @@ func (s) TestBlockingPickTimeout(t *testing.T) {
 	}
 }
 
-func (s) TestBlockingPick(t *testing.T) {
+func TestBlockingPick(t *testing.T) {
+	defer leakcheck.Check(t)
 	bp := newPickerWrapper()
 	// All goroutines should block because picker is nil in bp.
 	var finishedCount uint64
@@ -92,7 +95,8 @@ func (s) TestBlockingPick(t *testing.T) {
 	bp.updatePicker(&testingPicker{sc: testSC, maxCalled: goroutineCount})
 }
 
-func (s) TestBlockingPickNoSubAvailable(t *testing.T) {
+func TestBlockingPickNoSubAvailable(t *testing.T) {
+	defer leakcheck.Check(t)
 	bp := newPickerWrapper()
 	var finishedCount uint64
 	bp.updatePicker(&testingPicker{err: balancer.ErrNoSubConnAvailable, maxCalled: goroutineCount})
@@ -112,7 +116,8 @@ func (s) TestBlockingPickNoSubAvailable(t *testing.T) {
 	bp.updatePicker(&testingPicker{sc: testSC, maxCalled: goroutineCount})
 }
 
-func (s) TestBlockingPickTransientWaitforready(t *testing.T) {
+func TestBlockingPickTransientWaitforready(t *testing.T) {
+	defer leakcheck.Check(t)
 	bp := newPickerWrapper()
 	bp.updatePicker(&testingPicker{err: balancer.ErrTransientFailure, maxCalled: goroutineCount})
 	var finishedCount uint64
@@ -133,7 +138,8 @@ func (s) TestBlockingPickTransientWaitforready(t *testing.T) {
 	bp.updatePicker(&testingPicker{sc: testSC, maxCalled: goroutineCount})
 }
 
-func (s) TestBlockingPickSCNotReady(t *testing.T) {
+func TestBlockingPickSCNotReady(t *testing.T) {
+	defer leakcheck.Check(t)
 	bp := newPickerWrapper()
 	bp.updatePicker(&testingPicker{sc: testSCNotReady, maxCalled: goroutineCount})
 	var finishedCount uint64

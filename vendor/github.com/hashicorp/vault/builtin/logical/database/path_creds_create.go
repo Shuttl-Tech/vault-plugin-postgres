@@ -88,10 +88,8 @@ func (b *databaseBackend) pathCredsCreateRead() framework.OperationFunc {
 			"username": username,
 			"password": password,
 		}, map[string]interface{}{
-			"username":              username,
-			"role":                  name,
-			"db_name":               role.DBName,
-			"revocation_statements": role.Statements.Revocation,
+			"username": username,
+			"role":     name,
 		})
 		resp.Secret.TTL = role.DefaultTTL
 		resp.Secret.MaxTTL = role.MaxTTL

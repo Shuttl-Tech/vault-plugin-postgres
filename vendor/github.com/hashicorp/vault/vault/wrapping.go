@@ -16,7 +16,6 @@ import (
 	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/vault/helper/consts"
 	"github.com/hashicorp/vault/helper/jsonutil"
-	"github.com/hashicorp/vault/helper/namespace"
 	"github.com/hashicorp/vault/logical"
 )
 
@@ -75,10 +74,6 @@ func (c *Core) ensureWrappingKey(ctx context.Context) error {
 }
 
 func (c *Core) wrapInCubbyhole(ctx context.Context, req *logical.Request, resp *logical.Response, auth *logical.Auth) (*logical.Response, error) {
-	if c.perfStandby {
-		return forwardWrapRequest(ctx, c, req, resp, auth)
-	}
-
 	// Before wrapping, obey special rules for listing: if no entries are
 	// found, 404. This prevents unwrapping only to find empty data.
 	if req.Operation == logical.ListOperation {
@@ -109,33 +104,18 @@ DONELISTHANDLING:
 	var err error
 	sealWrap := resp.WrapInfo.SealWrap
 
-	var ns *namespace.Namespace
-	// If we are creating a JWT wrapping token we always want them to live in
-	// the root namespace. These are only used for replication and plugin setup.
-	switch resp.WrapInfo.Format {
-	case "jwt":
-		ns = namespace.RootNamespace
-		ctx = namespace.ContextWithNamespace(ctx, ns)
-	default:
-		ns, err = namespace.FromContext(ctx)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	// If we are wrapping, the first part (performed in this functions) happens
 	// before auditing so that resp.WrapInfo.Token can contain the HMAC'd
 	// wrapping token ID in the audit logs, so that it can be determined from
 	// the audit logs whether the token was ever actually used.
 	creationTime := time.Now()
-	te := logical.TokenEntry{
+	te := TokenEntry{
 		Path:           req.Path,
 		Policies:       []string{"response-wrapping"},
 		CreationTime:   creationTime.Unix(),
 		TTL:            resp.WrapInfo.TTL,
 		NumUses:        1,
 		ExplicitMaxTTL: resp.WrapInfo.TTL,
-		NamespaceID:    ns.ID,
 	}
 
 	if err := c.tokenStore.create(ctx, &te); err != nil {
@@ -199,7 +179,6 @@ DONELISTHANDLING:
 			SealWrap: true,
 		}
 	}
-	cubbyReq.SetTokenEntry(&te)
 
 	// During a rewrap, store the original response, don't wrap it again.
 	if req.Path == "sys/wrapping/rewrap" {
@@ -280,7 +259,7 @@ DONELISTHANDLING:
 	}
 
 	// Register the wrapped token with the expiration manager
-	if err := c.expiration.RegisterAuth(ctx, &te, wAuth); err != nil {
+	if err := c.expiration.RegisterAuth(te.Path, wAuth); err != nil {
 		// Revoke since it's not yet being tracked for expiration
 		c.tokenStore.revokeOrphan(ctx, te.ID)
 		c.logger.Error("failed to register cubbyhole wrapping token lease", "request_path", req.Path, "error", err)
@@ -291,7 +270,7 @@ DONELISTHANDLING:
 }
 
 // ValidateWrappingToken checks whether a token is a wrapping token.
-func (c *Core) ValidateWrappingToken(ctx context.Context, req *logical.Request) (bool, error) {
+func (c *Core) ValidateWrappingToken(req *logical.Request) (bool, error) {
 	if req == nil {
 		return false, fmt.Errorf("invalid request")
 	}
@@ -340,17 +319,16 @@ func (c *Core) ValidateWrappingToken(ctx context.Context, req *logical.Request) 
 		return false, fmt.Errorf("token is empty")
 	}
 
-	if c.Sealed() {
-		return false, consts.ErrSealed
-	}
-
 	c.stateLock.RLock()
 	defer c.stateLock.RUnlock()
-	if c.standby && !c.perfStandby {
+	if c.sealed {
+		return false, consts.ErrSealed
+	}
+	if c.standby {
 		return false, consts.ErrStandby
 	}
 
-	te, err := c.tokenStore.Lookup(ctx, token)
+	te, err := c.tokenStore.Lookup(c.activeContext, token)
 	if err != nil {
 		return false, err
 	}
@@ -364,12 +342,6 @@ func (c *Core) ValidateWrappingToken(ctx context.Context, req *logical.Request) 
 
 	if te.Policies[0] != responseWrappingPolicyName && te.Policies[0] != controlGroupPolicyName {
 		return false, nil
-	}
-
-	if !thirdParty {
-		req.ClientTokenAccessor = te.Accessor
-		req.ClientTokenRemainingUses = te.NumUses
-		req.SetTokenEntry(te)
 	}
 
 	return true, nil

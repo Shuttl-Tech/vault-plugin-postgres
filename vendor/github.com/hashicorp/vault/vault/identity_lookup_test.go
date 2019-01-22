@@ -1,9 +1,9 @@
 package vault
 
 import (
+	"context"
 	"testing"
 
-	"github.com/hashicorp/vault/helper/namespace"
 	"github.com/hashicorp/vault/logical"
 )
 
@@ -11,14 +11,13 @@ func TestIdentityStore_Lookup_Entity(t *testing.T) {
 	var err error
 	var resp *logical.Response
 
-	ctx := namespace.RootContext(nil)
-	i, accessor, _ := testIdentityStoreWithGithubAuth(ctx, t)
+	i, accessor, _ := testIdentityStoreWithGithubAuth(t)
 
 	entityReq := &logical.Request{
 		Path:      "entity",
 		Operation: logical.UpdateOperation,
 	}
-	resp, err = i.HandleRequest(ctx, entityReq)
+	resp, err = i.HandleRequest(context.Background(), entityReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: err: %#v\nresp: %v", err, resp)
 	}
@@ -34,7 +33,7 @@ func TestIdentityStore_Lookup_Entity(t *testing.T) {
 		},
 	}
 
-	resp, err = i.HandleRequest(ctx, aliasReq)
+	resp, err = i.HandleRequest(context.Background(), aliasReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: err: %#v\nresp: %v", err, resp)
 	}
@@ -52,7 +51,7 @@ func TestIdentityStore_Lookup_Entity(t *testing.T) {
 			"id": entityID,
 		},
 	}
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: err: %#v\nresp: %v", err, resp)
 	}
@@ -65,7 +64,7 @@ func TestIdentityStore_Lookup_Entity(t *testing.T) {
 		"name": entity.Name,
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: err: %#v\nresp: %v", err, resp)
 	}
@@ -78,7 +77,7 @@ func TestIdentityStore_Lookup_Entity(t *testing.T) {
 		"alias_id": aliasID,
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: err: %#v\nresp: %v", err, resp)
 	}
@@ -92,7 +91,7 @@ func TestIdentityStore_Lookup_Entity(t *testing.T) {
 		"alias_mount_accessor": accessor,
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: err: %#v\nresp: %v", err, resp)
 	}
@@ -107,7 +106,7 @@ func TestIdentityStore_Lookup_Entity(t *testing.T) {
 		"name": entity.Name,
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +119,7 @@ func TestIdentityStore_Lookup_Entity(t *testing.T) {
 		"alias_name": "testaliasname",
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +132,7 @@ func TestIdentityStore_Lookup_Entity(t *testing.T) {
 		"alias_mount_accessor": accessor,
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +143,7 @@ func TestIdentityStore_Lookup_Entity(t *testing.T) {
 	// Don't supply any criteria
 	lookupReq.Data = nil
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +154,7 @@ func TestIdentityStore_Lookup_Entity(t *testing.T) {
 	// Delete the alias in the entity
 	aliasReq.Path = "entity-alias/id/" + aliasID
 	aliasReq.Operation = logical.DeleteOperation
-	resp, err = i.HandleRequest(ctx, aliasReq)
+	resp, err = i.HandleRequest(context.Background(), aliasReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: err: %#v\nresp: %v", err, resp)
 	}
@@ -164,7 +163,7 @@ func TestIdentityStore_Lookup_Entity(t *testing.T) {
 		"alias_id": aliasID,
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: err: %#v\nresp: %v", err, resp)
 	}
@@ -177,14 +176,13 @@ func TestIdentityStore_Lookup_Group(t *testing.T) {
 	var err error
 	var resp *logical.Response
 
-	ctx := namespace.RootContext(nil)
-	i, accessor, _ := testIdentityStoreWithGithubAuth(ctx, t)
+	i, accessor, _ := testIdentityStoreWithGithubAuth(t)
 
 	groupReq := &logical.Request{
 		Path:      "group",
 		Operation: logical.UpdateOperation,
 	}
-	resp, err = i.HandleRequest(ctx, groupReq)
+	resp, err = i.HandleRequest(context.Background(), groupReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: resp: %#v\n err: %#v\n", resp, err)
 	}
@@ -199,7 +197,7 @@ func TestIdentityStore_Lookup_Group(t *testing.T) {
 		},
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: resp: %#v\n err: %#v\n", resp, err)
 	}
@@ -211,7 +209,7 @@ func TestIdentityStore_Lookup_Group(t *testing.T) {
 		"name": groupName,
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: resp: %#v\n err: %#v\n", resp, err)
 	}
@@ -223,7 +221,7 @@ func TestIdentityStore_Lookup_Group(t *testing.T) {
 	lookupReq.Data = map[string]interface{}{
 		"alias_id": "invalidaliasid",
 	}
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: resp: %#v\n err: %#v\n", resp, err)
 	}
@@ -234,7 +232,7 @@ func TestIdentityStore_Lookup_Group(t *testing.T) {
 	groupReq.Data = map[string]interface{}{
 		"type": "external",
 	}
-	resp, err = i.HandleRequest(ctx, groupReq)
+	resp, err = i.HandleRequest(context.Background(), groupReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: resp: %#v\n err: %#v\n", resp, err)
 	}
@@ -249,7 +247,7 @@ func TestIdentityStore_Lookup_Group(t *testing.T) {
 			"mount_accessor": accessor,
 		},
 	}
-	resp, err = i.HandleRequest(ctx, aliasReq)
+	resp, err = i.HandleRequest(context.Background(), aliasReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: resp: %#v\n err: %#v\n", resp, err)
 	}
@@ -259,7 +257,7 @@ func TestIdentityStore_Lookup_Group(t *testing.T) {
 		"alias_id": aliasID,
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: resp: %#v\n err: %#v\n", resp, err)
 	}
@@ -272,7 +270,7 @@ func TestIdentityStore_Lookup_Group(t *testing.T) {
 		"alias_mount_accessor": accessor,
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("bad: resp: %#v\n err: %#v\n", resp, err)
 	}
@@ -286,7 +284,7 @@ func TestIdentityStore_Lookup_Group(t *testing.T) {
 		"name": groupName,
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +297,7 @@ func TestIdentityStore_Lookup_Group(t *testing.T) {
 		"alias_name": "testgroupalias",
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +310,7 @@ func TestIdentityStore_Lookup_Group(t *testing.T) {
 		"alias_mount_accessor": accessor,
 	}
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +321,7 @@ func TestIdentityStore_Lookup_Group(t *testing.T) {
 	// Don't supply any criteria
 	lookupReq.Data = nil
 
-	resp, err = i.HandleRequest(ctx, lookupReq)
+	resp, err = i.HandleRequest(context.Background(), lookupReq)
 	if err != nil {
 		t.Fatal(err)
 	}

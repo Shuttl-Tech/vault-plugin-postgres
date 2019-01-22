@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"regexp"
 	"sort"
 	"strings"
@@ -14,9 +13,9 @@ import (
 
 	"github.com/hashicorp/errwrap"
 	log "github.com/hashicorp/go-hclog"
-	multierror "github.com/hashicorp/go-multierror"
+
+	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/vault/helper/errutil"
-	"github.com/hashicorp/vault/helper/license"
 	"github.com/hashicorp/vault/helper/logging"
 	"github.com/hashicorp/vault/helper/parseutil"
 	"github.com/hashicorp/vault/logical"
@@ -183,14 +182,6 @@ func (b *Backend) HandleRequest(ctx context.Context, req *logical.Request) (*log
 		return nil, logical.ErrUnsupportedPath
 	}
 
-	// Check if a feature is required and if the license has that feature
-	if path.FeatureRequired != license.FeatureNone {
-		hasFeature := b.system.HasFeature(path.FeatureRequired)
-		if !hasFeature {
-			return nil, logical.CodedError(401, "Feature Not Enabled")
-		}
-	}
-
 	// Build up the data for the route, with the URL taking priority
 	// for the fields over the PUT data.
 	raw := make(map[string]interface{}, len(path.Fields))
@@ -201,22 +192,15 @@ func (b *Backend) HandleRequest(ctx context.Context, req *logical.Request) (*log
 		raw[k] = v
 	}
 
-	// Look up the callback for this operation, preferring the
-	// path.Operations definition if present.
+	// Look up the callback for this operation
 	var callback OperationFunc
-
-	if path.Operations != nil {
-		if op, ok := path.Operations[req.Operation]; ok {
-			callback = op.Handler()
-		}
-	} else {
-		callback = path.Callbacks[req.Operation]
+	var ok bool
+	if path.Callbacks != nil {
+		callback, ok = path.Callbacks[req.Operation]
 	}
-	ok := callback != nil
-
 	if !ok {
 		if req.Operation == logical.HelpOperation {
-			callback = path.helpCallback(b)
+			callback = path.helpCallback()
 			ok = true
 		}
 	}
@@ -235,6 +219,7 @@ func (b *Backend) HandleRequest(ctx context.Context, req *logical.Request) (*log
 		}
 	}
 
+	// Call the callback with the request and the data
 	return callback(ctx, req, &fd)
 }
 
@@ -375,13 +360,7 @@ func (b *Backend) handleRootHelp() (*logical.Response, error) {
 		return nil, err
 	}
 
-	// Build OpenAPI response for the entire backend
-	doc := NewOASDocument()
-	if err := documentPaths(b, doc); err != nil {
-		b.Logger().Warn("error generating OpenAPI", "error", err)
-	}
-
-	return logical.HelpResponse(help, nil, doc), nil
+	return logical.HelpResponse(help, nil), nil
 }
 
 func (b *Backend) handleRevokeRenew(ctx context.Context, req *logical.Request) (*logical.Response, error) {
@@ -503,14 +482,6 @@ type FieldSchema struct {
 	Type        FieldType
 	Default     interface{}
 	Description string
-	Required    bool
-	Deprecated  bool
-
-	// AllowedValues is an optional list of permitted values for this field.
-	// This constraint is not (yet) enforced by the framework, but the list is
-	// output as part of OpenAPI generation and may effect documentation and
-	// dynamic UI generation.
-	AllowedValues []interface{}
 }
 
 // DefaultOrZero returns the default value if it is set, or otherwise
@@ -559,7 +530,9 @@ func (s *FieldSchema) DefaultOrZero() interface{} {
 // Zero returns the correct zero-value for a specific FieldType
 func (t FieldType) Zero() interface{} {
 	switch t {
-	case TypeString, TypeNameString, TypeLowerCaseString:
+	case TypeNameString:
+		return ""
+	case TypeString:
 		return ""
 	case TypeInt:
 		return 0
@@ -577,8 +550,6 @@ func (t FieldType) Zero() interface{} {
 		return []string{}
 	case TypeCommaIntSlice:
 		return []int{}
-	case TypeHeader:
-		return http.Header{}
 	default:
 		panic("unknown type: " + t.String())
 	}

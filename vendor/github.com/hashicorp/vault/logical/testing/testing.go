@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/helper/logging"
-	"github.com/hashicorp/vault/helper/namespace"
 	"github.com/hashicorp/vault/http"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/physical/inmem"
@@ -33,19 +32,12 @@ type TestCase struct {
 	// test running.
 	PreCheck func()
 
-	// LogicalBackend is the backend that will be mounted.
-	LogicalBackend logical.Backend
+	// Backend is the backend that will be mounted.
+	Backend logical.Backend
 
-	// LogicalFactory can be used instead of LogicalBackend if the
+	// Factory can be used instead of Backend if the
 	// backend requires more construction
-	LogicalFactory logical.Factory
-
-	// CredentialBackend is the backend that will be mounted.
-	CredentialBackend logical.Backend
-
-	// CredentialFactory can be used instead of CredentialBackend if the
-	// backend requires more construction
-	CredentialFactory logical.Factory
+	Factory logical.Factory
 
 	// Steps are the set of operations that are run for this test case.
 	Steps []TestStep
@@ -142,15 +134,8 @@ func Test(tt TestT, c TestCase) {
 	}
 
 	// Check that something is provided
-	if c.LogicalBackend == nil && c.LogicalFactory == nil {
-		if c.CredentialBackend == nil && c.CredentialFactory == nil {
-			tt.Fatal("Must provide either Backend or Factory")
-			return
-		}
-	}
-	// We currently only support doing one logical OR one credential test at a time.
-	if (c.LogicalFactory != nil || c.LogicalBackend != nil) && (c.CredentialFactory != nil || c.CredentialBackend != nil) {
-		tt.Fatal("Must provide only one backend or factory")
+	if c.Backend == nil && c.Factory == nil {
+		tt.Fatal("Must provide either Backend or Factory")
 		return
 	}
 
@@ -163,34 +148,18 @@ func Test(tt TestT, c TestCase) {
 		return
 	}
 
-	config := &vault.CoreConfig{
-		Physical:        phys,
-		DisableMlock:    true,
-		BuiltinRegistry: vault.NewMockBuiltinRegistry(),
-	}
-
-	if c.LogicalBackend != nil || c.LogicalFactory != nil {
-		config.LogicalBackends = map[string]logical.Factory{
+	core, err := vault.NewCore(&vault.CoreConfig{
+		Physical: phys,
+		LogicalBackends: map[string]logical.Factory{
 			"test": func(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
-				if c.LogicalBackend != nil {
-					return c.LogicalBackend, nil
+				if c.Backend != nil {
+					return c.Backend, nil
 				}
-				return c.LogicalFactory(ctx, conf)
+				return c.Factory(ctx, conf)
 			},
-		}
-	}
-	if c.CredentialBackend != nil || c.CredentialFactory != nil {
-		config.CredentialBackends = map[string]logical.Factory{
-			"test": func(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
-				if c.CredentialBackend != nil {
-					return c.CredentialBackend, nil
-				}
-				return c.CredentialFactory(ctx, conf)
-			},
-		}
-	}
-
-	core, err := vault.NewCore(config)
+		},
+		DisableMlock: true,
+	})
 	if err != nil {
 		tt.Fatal("error initializing core: ", err)
 		return
@@ -232,45 +201,15 @@ func Test(tt TestT, c TestCase) {
 	// Set the token so we're authenticated
 	client.SetToken(init.RootToken)
 
+	// Mount the backend
 	prefix := "mnt"
-	if c.LogicalBackend != nil || c.LogicalFactory != nil {
-		// Mount the backend
-		mountInfo := &api.MountInput{
-			Type:        "test",
-			Description: "acceptance test",
-		}
-		if err := client.Sys().Mount(prefix, mountInfo); err != nil {
-			tt.Fatal("error mounting backend: ", err)
-			return
-		}
+	mountInfo := &api.MountInput{
+		Type:        "test",
+		Description: "acceptance test",
 	}
-
-	isAuthBackend := false
-	if c.CredentialBackend != nil || c.CredentialFactory != nil {
-		isAuthBackend = true
-
-		// Enable the test auth method
-		opts := &api.EnableAuthOptions{
-			Type: "test",
-		}
-		if err := client.Sys().EnableAuthWithOptions(prefix, opts); err != nil {
-			tt.Fatal("error enabling backend: ", err)
-			return
-		}
-	}
-
-	tokenInfo, err := client.Auth().Token().LookupSelf()
-	if err != nil {
-		tt.Fatal("error looking up token: ", err)
+	if err := client.Sys().Mount(prefix, mountInfo); err != nil {
+		tt.Fatal("error mounting backend: ", err)
 		return
-	}
-	var tokenPolicies []string
-	if tokenPoliciesRaw, ok := tokenInfo.Data["policies"]; ok {
-		if tokenPoliciesSliceRaw, ok := tokenPoliciesRaw.([]interface{}); ok {
-			for _, p := range tokenPoliciesSliceRaw {
-				tokenPolicies = append(tokenPolicies, p.(string))
-			}
-		}
 	}
 
 	// Make requests
@@ -288,12 +227,6 @@ func Test(tt TestT, c TestCase) {
 		}
 		if !s.Unauthenticated {
 			req.ClientToken = client.Token()
-			req.SetTokenEntry(&logical.TokenEntry{
-				ID:          req.ClientToken,
-				NamespaceID: namespace.RootNamespaceID,
-				Policies:    tokenPolicies,
-				DisplayName: tokenInfo.Data["display_name"].(string),
-			})
 		}
 		if s.RemoteAddr != "" {
 			req.Connection = &logical.Connection{RemoteAddr: s.RemoteAddr}
@@ -315,13 +248,8 @@ func Test(tt TestT, c TestCase) {
 		// Make sure to prefix the path with where we mounted the thing
 		req.Path = fmt.Sprintf("%s/%s", prefix, req.Path)
 
-		if isAuthBackend {
-			// Prepend the path with "auth"
-			req.Path = "auth/" + req.Path
-		}
-
 		// Make the request
-		resp, err := core.HandleRequest(namespace.RootContext(nil), req)
+		resp, err := core.HandleRequest(req)
 		if resp != nil && resp.Secret != nil {
 			// Revoke this secret later
 			revoke = append(revoke, &logical.Request{
@@ -375,7 +303,7 @@ func Test(tt TestT, c TestCase) {
 			logger.Warn("Revoking secret", "secret", fmt.Sprintf("%#v", req))
 		}
 		req.ClientToken = client.Token()
-		resp, err := core.HandleRequest(namespace.RootContext(nil), req)
+		resp, err := core.HandleRequest(req)
 		if err == nil && resp.IsError() {
 			err = fmt.Errorf("erroneous response:\n\n%#v", resp)
 		}
@@ -389,14 +317,10 @@ func Test(tt TestT, c TestCase) {
 	// We set the "immediate" flag here that any backend can pick up on
 	// to do all rollbacks immediately even if the WAL entries are new.
 	logger.Warn("Requesting RollbackOperation")
-	rollbackPath := prefix + "/"
-	if c.CredentialFactory != nil || c.CredentialBackend != nil {
-		rollbackPath = "auth/" + rollbackPath
-	}
-	req := logical.RollbackRequest(rollbackPath)
+	req := logical.RollbackRequest(prefix + "/")
 	req.Data["immediate"] = true
 	req.ClientToken = client.Token()
-	resp, err := core.HandleRequest(namespace.RootContext(nil), req)
+	resp, err := core.HandleRequest(req)
 	if err == nil && resp.IsError() {
 		err = fmt.Errorf("erroneous response:\n\n%#v", resp)
 	}

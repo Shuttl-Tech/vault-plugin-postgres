@@ -140,9 +140,7 @@ func testBackend(t *testing.T) (logical.Backend, func()) {
 	// Create a mock provider
 	pluginMap := map[string]gplugin.Plugin{
 		"backend": &BackendPlugin{
-			GRPCBackendPlugin: &GRPCBackendPlugin{
-				Factory: mock.Factory,
-			},
+			Factory: mock.Factory,
 		},
 	}
 	client, _ := gplugin.TestPluginRPCConn(t, pluginMap, nil)

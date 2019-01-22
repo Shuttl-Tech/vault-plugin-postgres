@@ -7,13 +7,13 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
+
+	"sync"
 
 	"github.com/hashicorp/errwrap"
 	log "github.com/hashicorp/go-hclog"
-	plugin "github.com/hashicorp/go-plugin"
-	"github.com/hashicorp/vault/helper/consts"
+	"github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/vault/helper/pluginutil"
 	"github.com/hashicorp/vault/logical"
 )
@@ -61,9 +61,9 @@ func (b *BackendPluginClient) Cleanup(ctx context.Context) {
 // external plugins, or a concrete implementation of the backend if it is a builtin backend.
 // The backend is returned as a logical.Backend interface. The isMetadataMode param determines whether
 // the plugin should run in metadata mode.
-func NewBackend(ctx context.Context, pluginName string, pluginType consts.PluginType, sys pluginutil.LookRunnerUtil, conf *logical.BackendConfig, isMetadataMode bool) (logical.Backend, error) {
+func NewBackend(ctx context.Context, pluginName string, sys pluginutil.LookRunnerUtil, logger log.Logger, isMetadataMode bool) (logical.Backend, error) {
 	// Look for plugin in the plugin catalog
-	pluginRunner, err := sys.LookupPlugin(ctx, pluginName, pluginType)
+	pluginRunner, err := sys.LookupPlugin(ctx, pluginName)
 	if err != nil {
 		return nil, err
 	}
@@ -71,22 +71,21 @@ func NewBackend(ctx context.Context, pluginName string, pluginType consts.Plugin
 	var backend logical.Backend
 	if pluginRunner.Builtin {
 		// Plugin is builtin so we can retrieve an instance of the interface
-		// from the pluginRunner. Then cast it to logical.Factory.
-		rawFactory, err := pluginRunner.BuiltinFactory()
+		// from the pluginRunner. Then cast it to logical.Backend.
+		backendRaw, err := pluginRunner.BuiltinFactory()
 		if err != nil {
 			return nil, errwrap.Wrapf("error getting plugin type: {{err}}", err)
 		}
 
-		if factory, ok := rawFactory.(logical.Factory); !ok {
+		var ok bool
+		backend, ok = backendRaw.(logical.Backend)
+		if !ok {
 			return nil, fmt.Errorf("unsupported backend type: %q", pluginName)
-		} else {
-			if backend, err = factory(ctx, conf); err != nil {
-				return nil, err
-			}
 		}
+
 	} else {
 		// create a backendPluginClient instance
-		backend, err = NewPluginClient(ctx, sys, pluginRunner, conf.Logger, isMetadataMode)
+		backend, err = newPluginClient(ctx, sys, pluginRunner, logger, isMetadataMode)
 		if err != nil {
 			return nil, err
 		}
@@ -95,20 +94,11 @@ func NewBackend(ctx context.Context, pluginName string, pluginType consts.Plugin
 	return backend, nil
 }
 
-func NewPluginClient(ctx context.Context, sys pluginutil.RunnerUtil, pluginRunner *pluginutil.PluginRunner, logger log.Logger, isMetadataMode bool) (logical.Backend, error) {
+func newPluginClient(ctx context.Context, sys pluginutil.RunnerUtil, pluginRunner *pluginutil.PluginRunner, logger log.Logger, isMetadataMode bool) (logical.Backend, error) {
 	// pluginMap is the map of plugins we can dispense.
-	pluginSet := map[int]plugin.PluginSet{
-		3: plugin.PluginSet{
-			"backend": &BackendPlugin{
-				GRPCBackendPlugin: &GRPCBackendPlugin{
-					MetadataMode: isMetadataMode,
-				},
-			},
-		},
-		4: plugin.PluginSet{
-			"backend": &GRPCBackendPlugin{
-				MetadataMode: isMetadataMode,
-			},
+	pluginMap := map[string]plugin.Plugin{
+		"backend": &BackendPlugin{
+			metadataMode: isMetadataMode,
 		},
 	}
 
@@ -117,9 +107,9 @@ func NewPluginClient(ctx context.Context, sys pluginutil.RunnerUtil, pluginRunne
 	var client *plugin.Client
 	var err error
 	if isMetadataMode {
-		client, err = pluginRunner.RunMetadataMode(ctx, sys, pluginSet, handshakeConfig, []string{}, namedLogger)
+		client, err = pluginRunner.RunMetadataMode(ctx, sys, pluginMap, handshakeConfig, []string{}, namedLogger)
 	} else {
-		client, err = pluginRunner.Run(ctx, sys, pluginSet, handshakeConfig, []string{}, namedLogger)
+		client, err = pluginRunner.Run(ctx, sys, pluginMap, handshakeConfig, []string{}, namedLogger)
 	}
 	if err != nil {
 		return nil, err
@@ -143,7 +133,6 @@ func NewPluginClient(ctx context.Context, sys pluginutil.RunnerUtil, pluginRunne
 	// implementation but is in fact over an RPC connection.
 	switch raw.(type) {
 	case *backendPluginClient:
-		logger.Warn("plugin is using deprecated netRPC transport, recompile plugin to upgrade to gRPC", "plugin", pluginRunner.Name)
 		backend = raw.(*backendPluginClient)
 		transport = "netRPC"
 	case *backendGRPCPluginClient:

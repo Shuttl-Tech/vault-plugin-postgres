@@ -18,7 +18,7 @@ func TestCloneUpdate(t *testing.T) {
 	)
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		LogicalBackend: backend,
+		Backend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/"+testCloneSourceCluster, attrs, false),
 			testAccWriteDbConfig(t, "cluster/"+testCloneSourceCluster+"/"+testCloneDb),

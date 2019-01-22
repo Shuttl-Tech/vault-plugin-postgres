@@ -464,6 +464,30 @@ func LogicalResponseToProtoResponse(r *logical.Response) (*Response, error) {
 	}, nil
 }
 
+func LogicalAliasToProtoAlias(a *logical.Alias) *Alias {
+	if a == nil {
+		return nil
+	}
+
+	return &Alias{
+		MountType:     a.MountType,
+		MountAccessor: a.MountAccessor,
+		Name:          a.Name,
+	}
+}
+
+func ProtoAliasToLogicalAlias(a *Alias) *logical.Alias {
+	if a == nil {
+		return nil
+	}
+
+	return &logical.Alias{
+		MountType:     a.MountType,
+		MountAccessor: a.MountAccessor,
+		Name:          a.Name,
+	}
+}
+
 func LogicalAuthToProtoAuth(a *logical.Auth) (*Auth, error) {
 	if a == nil {
 		return nil, nil
@@ -472,6 +496,11 @@ func LogicalAuthToProtoAuth(a *logical.Auth) (*Auth, error) {
 	buf, err := json.Marshal(a.InternalData)
 	if err != nil {
 		return nil, err
+	}
+
+	groupAliases := make([]*Alias, len(a.GroupAliases))
+	for i, al := range a.GroupAliases {
+		groupAliases[i] = LogicalAliasToProtoAlias(al)
 	}
 
 	lo, err := LogicalLeaseOptionsToProtoLeaseOptions(a.LeaseOptions)
@@ -485,23 +514,19 @@ func LogicalAuthToProtoAuth(a *logical.Auth) (*Auth, error) {
 	}
 
 	return &Auth{
-		LeaseOptions:     lo,
-		TokenType:        uint32(a.TokenType),
-		InternalData:     string(buf[:]),
-		DisplayName:      a.DisplayName,
-		Policies:         a.Policies,
-		TokenPolicies:    a.TokenPolicies,
-		IdentityPolicies: a.IdentityPolicies,
-		Metadata:         a.Metadata,
-		ClientToken:      a.ClientToken,
-		Accessor:         a.Accessor,
-		Period:           int64(a.Period),
-		NumUses:          int64(a.NumUses),
-		EntityID:         a.EntityID,
-		Alias:            a.Alias,
-		GroupAliases:     a.GroupAliases,
-		BoundCIDRs:       boundCIDRs,
-		ExplicitMaxTTL:   int64(a.ExplicitMaxTTL),
+		LeaseOptions: lo,
+		InternalData: string(buf[:]),
+		DisplayName:  a.DisplayName,
+		Policies:     a.Policies,
+		Metadata:     a.Metadata,
+		ClientToken:  a.ClientToken,
+		Accessor:     a.Accessor,
+		Period:       int64(a.Period),
+		NumUses:      int64(a.NumUses),
+		EntityID:     a.EntityID,
+		Alias:        LogicalAliasToProtoAlias(a.Alias),
+		GroupAliases: groupAliases,
+		BoundCidrs:   boundCIDRs,
 	}, nil
 }
 
@@ -516,12 +541,17 @@ func ProtoAuthToLogicalAuth(a *Auth) (*logical.Auth, error) {
 		return nil, err
 	}
 
+	groupAliases := make([]*logical.Alias, len(a.GroupAliases))
+	for i, al := range a.GroupAliases {
+		groupAliases[i] = ProtoAliasToLogicalAlias(al)
+	}
+
 	lo, err := ProtoLeaseOptionsToLogicalLeaseOptions(a.LeaseOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	boundCIDRs, err := parseutil.ParseAddrs(a.BoundCIDRs)
+	boundCIDRs, err := parseutil.ParseAddrs(a.BoundCidrs)
 	if err != nil {
 		return nil, err
 	}
@@ -532,91 +562,18 @@ func ProtoAuthToLogicalAuth(a *Auth) (*logical.Auth, error) {
 	}
 
 	return &logical.Auth{
-		LeaseOptions:     lo,
-		TokenType:        logical.TokenType(a.TokenType),
-		InternalData:     data,
-		DisplayName:      a.DisplayName,
-		Policies:         a.Policies,
-		TokenPolicies:    a.TokenPolicies,
-		IdentityPolicies: a.IdentityPolicies,
-		Metadata:         a.Metadata,
-		ClientToken:      a.ClientToken,
-		Accessor:         a.Accessor,
-		Period:           time.Duration(a.Period),
-		NumUses:          int(a.NumUses),
-		EntityID:         a.EntityID,
-		Alias:            a.Alias,
-		GroupAliases:     a.GroupAliases,
-		BoundCIDRs:       boundCIDRs,
-		ExplicitMaxTTL:   time.Duration(a.ExplicitMaxTTL),
-	}, nil
-}
-
-func LogicalTokenEntryToProtoTokenEntry(t *logical.TokenEntry) *TokenEntry {
-	if t == nil {
-		return nil
-	}
-
-	boundCIDRs := make([]string, len(t.BoundCIDRs))
-	for i, cidr := range t.BoundCIDRs {
-		boundCIDRs[i] = cidr.String()
-	}
-
-	return &TokenEntry{
-		ID:             t.ID,
-		Accessor:       t.Accessor,
-		Parent:         t.Parent,
-		Policies:       t.Policies,
-		Path:           t.Path,
-		Meta:           t.Meta,
-		DisplayName:    t.DisplayName,
-		NumUses:        int64(t.NumUses),
-		CreationTime:   t.CreationTime,
-		TTL:            int64(t.TTL),
-		ExplicitMaxTTL: int64(t.ExplicitMaxTTL),
-		Role:           t.Role,
-		Period:         int64(t.Period),
-		EntityID:       t.EntityID,
-		BoundCIDRs:     boundCIDRs,
-		NamespaceID:    t.NamespaceID,
-		CubbyholeID:    t.CubbyholeID,
-		Type:           uint32(t.Type),
-	}
-}
-
-func ProtoTokenEntryToLogicalTokenEntry(t *TokenEntry) (*logical.TokenEntry, error) {
-	if t == nil {
-		return nil, nil
-	}
-
-	boundCIDRs, err := parseutil.ParseAddrs(t.BoundCIDRs)
-	if err != nil {
-		return nil, err
-	}
-	if len(boundCIDRs) == 0 {
-		// On inbound auths, if auth.BoundCIDRs is empty, it will be nil.
-		// Let's match that behavior outbound.
-		boundCIDRs = nil
-	}
-
-	return &logical.TokenEntry{
-		ID:             t.ID,
-		Accessor:       t.Accessor,
-		Parent:         t.Parent,
-		Policies:       t.Policies,
-		Path:           t.Path,
-		Meta:           t.Meta,
-		DisplayName:    t.DisplayName,
-		NumUses:        int(t.NumUses),
-		CreationTime:   t.CreationTime,
-		TTL:            time.Duration(t.TTL),
-		ExplicitMaxTTL: time.Duration(t.ExplicitMaxTTL),
-		Role:           t.Role,
-		Period:         time.Duration(t.Period),
-		EntityID:       t.EntityID,
-		BoundCIDRs:     boundCIDRs,
-		NamespaceID:    t.NamespaceID,
-		CubbyholeID:    t.CubbyholeID,
-		Type:           logical.TokenType(t.Type),
+		LeaseOptions: lo,
+		InternalData: data,
+		DisplayName:  a.DisplayName,
+		Policies:     a.Policies,
+		Metadata:     a.Metadata,
+		ClientToken:  a.ClientToken,
+		Accessor:     a.Accessor,
+		Period:       time.Duration(a.Period),
+		NumUses:      int(a.NumUses),
+		EntityID:     a.EntityID,
+		Alias:        ProtoAliasToLogicalAlias(a.Alias),
+		GroupAliases: groupAliases,
+		BoundCIDRs:   boundCIDRs,
 	}, nil
 }

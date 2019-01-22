@@ -7,10 +7,9 @@ import (
 	"fmt"
 	"strings"
 
-	uuid "github.com/hashicorp/go-uuid"
+	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/vault/audit"
 	"github.com/hashicorp/vault/helper/jsonutil"
-	"github.com/hashicorp/vault/helper/namespace"
 	"github.com/hashicorp/vault/helper/salt"
 	"github.com/hashicorp/vault/logical"
 )
@@ -40,7 +39,7 @@ var (
 )
 
 // enableAudit is used to enable a new audit backend
-func (c *Core) enableAudit(ctx context.Context, entry *MountEntry, updateStorage bool) error {
+func (c *Core) enableAudit(ctx context.Context, entry *MountEntry) error {
 	// Ensure we end the path in a slash
 	if !strings.HasSuffix(entry.Path, "/") {
 		entry.Path += "/"
@@ -82,16 +81,14 @@ func (c *Core) enableAudit(ctx context.Context, entry *MountEntry, updateStorage
 		}
 		entry.Accessor = accessor
 	}
-	viewPath := entry.ViewPath()
+	viewPath := auditBarrierPrefix + entry.UUID + "/"
 	view := NewBarrierView(c.barrier, viewPath)
-	addAuditPathChecker(c, entry, view, viewPath)
-	origViewReadOnlyErr := view.getReadOnlyErr()
 
 	// Mark the view as read-only until the mounting is complete and
 	// ensure that it is reset after. This ensures that there will be no
 	// writes during the construction of the backend.
 	view.setReadOnlyErr(logical.ErrSetupReadOnly)
-	defer view.setReadOnlyErr(origViewReadOnlyErr)
+	defer view.setReadOnlyErr(nil)
 
 	// Lookup the new backend
 	backend, err := c.newAuditBackend(ctx, entry, view, entry.Options)
@@ -104,33 +101,22 @@ func (c *Core) enableAudit(ctx context.Context, entry *MountEntry, updateStorage
 
 	newTable := c.audit.shallowClone()
 	newTable.Entries = append(newTable.Entries, entry)
-
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
-	entry.NamespaceID = ns.ID
-	entry.namespace = ns
-
-	if updateStorage {
-		if err := c.persistAudit(ctx, newTable, entry.Local); err != nil {
-			return errors.New("failed to update audit table")
-		}
+	if err := c.persistAudit(ctx, newTable, entry.Local); err != nil {
+		return errors.New("failed to update audit table")
 	}
 
 	c.audit = newTable
 
 	// Register the backend
-	c.auditBroker.Register(entry.Path, backend, view, entry.Local)
+	c.auditBroker.Register(entry.Path, backend, view)
 	if c.logger.IsInfo() {
 		c.logger.Info("enabled audit backend", "path", entry.Path, "type", entry.Type)
 	}
-
 	return nil
 }
 
 // disableAudit is used to disable an existing audit backend
-func (c *Core) disableAudit(ctx context.Context, path string, updateStorage bool) (bool, error) {
+func (c *Core) disableAudit(ctx context.Context, path string) (bool, error) {
 	// Ensure we end the path in a slash
 	if !strings.HasSuffix(path, "/") {
 		path += "/"
@@ -141,10 +127,7 @@ func (c *Core) disableAudit(ctx context.Context, path string, updateStorage bool
 	defer c.auditLock.Unlock()
 
 	newTable := c.audit.shallowClone()
-	entry, err := newTable.remove(ctx, path)
-	if err != nil {
-		return false, err
-	}
+	entry := newTable.remove(path)
 
 	// Ensure there was a match
 	if entry == nil {
@@ -159,11 +142,9 @@ func (c *Core) disableAudit(ctx context.Context, path string, updateStorage bool
 		newTable.Entries = nil
 	}
 
-	if updateStorage {
-		// Update the audit table
-		if err := c.persistAudit(ctx, newTable, entry.Local); err != nil {
-			return true, errors.New("failed to update audit table")
-		}
+	// Update the audit table
+	if err := c.persistAudit(ctx, newTable, entry.Local); err != nil {
+		return true, errors.New("failed to update audit table")
 	}
 
 	c.audit = newTable
@@ -173,8 +154,6 @@ func (c *Core) disableAudit(ctx context.Context, path string, updateStorage bool
 	if c.logger.IsInfo() {
 		c.logger.Info("disabled audit backend", "path", path)
 	}
-
-	removeAuditPathChecker(c, entry)
 
 	return true, nil
 }
@@ -243,23 +222,9 @@ func (c *Core) loadAudits(ctx context.Context) error {
 			entry.Accessor = accessor
 			needPersist = true
 		}
-
-		if entry.NamespaceID == "" {
-			entry.NamespaceID = namespace.RootNamespaceID
-			needPersist = true
-		}
-		// Get the namespace from the namespace ID and load it in memory
-		ns, err := NamespaceByID(ctx, entry.NamespaceID, c)
-		if err != nil {
-			return err
-		}
-		if ns == nil {
-			return namespace.ErrNoNamespace
-		}
-		entry.namespace = ns
 	}
 
-	if !needPersist || c.perfStandby {
+	if !needPersist {
 		return nil
 	}
 
@@ -343,9 +308,7 @@ func (c *Core) persistAudit(ctx context.Context, table *MountTable, localOnly bo
 // setupAudit is invoked after we've loaded the audit able to
 // initialize the audit backends
 func (c *Core) setupAudits(ctx context.Context) error {
-	brokerLogger := c.baseLogger.Named("audit")
-	c.AddLogger(brokerLogger)
-	broker := NewAuditBroker(brokerLogger)
+	broker := NewAuditBroker(c.logger.ResetNamed("audit"))
 
 	c.auditLock.Lock()
 	defer c.auditLock.Unlock()
@@ -354,17 +317,15 @@ func (c *Core) setupAudits(ctx context.Context) error {
 
 	for _, entry := range c.audit.Entries {
 		// Create a barrier view using the UUID
-		viewPath := entry.ViewPath()
+		viewPath := auditBarrierPrefix + entry.UUID + "/"
 		view := NewBarrierView(c.barrier, viewPath)
-		addAuditPathChecker(c, entry, view, viewPath)
-		origViewReadOnlyErr := view.getReadOnlyErr()
 
 		// Mark the view as read-only until the mounting is complete and
 		// ensure that it is reset after. This ensures that there will be no
 		// writes during the construction of the backend.
 		view.setReadOnlyErr(logical.ErrSetupReadOnly)
 		c.postUnsealFuncs = append(c.postUnsealFuncs, func() {
-			view.setReadOnlyErr(origViewReadOnlyErr)
+			view.setReadOnlyErr(nil)
 		})
 
 		// Initialize the backend
@@ -379,9 +340,9 @@ func (c *Core) setupAudits(ctx context.Context) error {
 		}
 
 		// Mount the backend
-		broker.Register(entry.Path, backend, view, entry.Local)
+		broker.Register(entry.Path, backend, view)
 
-		successCount++
+		successCount += 1
 	}
 
 	if len(c.audit.Entries) > 0 && successCount == 0 {
@@ -401,7 +362,6 @@ func (c *Core) teardownAudits() error {
 	if c.audit != nil {
 		for _, entry := range c.audit.Entries {
 			c.removeAuditReloadFunc(entry)
-			removeAuditPathChecker(c, entry)
 		}
 	}
 
@@ -419,7 +379,7 @@ func (c *Core) removeAuditReloadFunc(entry *MountEntry) {
 		c.reloadFuncsLock.Lock()
 
 		if c.logger.IsDebug() {
-			c.baseLogger.Named("audit").Debug("removing reload function", "path", entry.Path)
+			c.logger.ResetNamed("audit").Debug("removing reload function", "path", entry.Path)
 		}
 
 		delete(c.reloadFuncs, key)
@@ -452,8 +412,7 @@ func (c *Core) newAuditBackend(ctx context.Context, entry *MountEntry, view logi
 		return nil, fmt.Errorf("nil backend returned from %q factory function", entry.Type)
 	}
 
-	auditLogger := c.baseLogger.Named("audit")
-	c.AddLogger(auditLogger)
+	auditLogger := c.logger.ResetNamed("audit")
 
 	switch entry.Type {
 	case "file":

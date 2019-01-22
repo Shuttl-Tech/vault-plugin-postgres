@@ -25,7 +25,7 @@ func TestAccDatabaseCreate_basic(t *testing.T) {
 	}
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		LogicalBackend: backend,
+		Backend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/test-acc-db", attr, false),
 			testAccWriteDbConfig(t, "cluster/test-acc-db/test-db"),

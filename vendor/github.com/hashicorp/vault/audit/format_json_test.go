@@ -13,7 +13,6 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/vault/helper/jsonutil"
-	"github.com/hashicorp/vault/helper/namespace"
 	"github.com/hashicorp/vault/helper/salt"
 	"github.com/hashicorp/vault/logical"
 )
@@ -37,13 +36,7 @@ func TestFormatJSON_formatRequest(t *testing.T) {
 		ExpectedStr string
 	}{
 		"auth, request": {
-			&logical.Auth{
-				ClientToken: "foo",
-				Accessor:    "bar",
-				DisplayName: "testtoken",
-				Policies:    []string{"root"},
-				TokenType:   logical.TokenTypeService,
-			},
+			&logical.Auth{ClientToken: "foo", Accessor: "bar", DisplayName: "testtoken", Policies: []string{"root"}},
 			&logical.Request{
 				Operation: logical.UpdateOperation,
 				Path:      "/foo",
@@ -62,13 +55,7 @@ func TestFormatJSON_formatRequest(t *testing.T) {
 			expectedResultStr,
 		},
 		"auth, request with prefix": {
-			&logical.Auth{
-				ClientToken: "foo",
-				Accessor:    "bar",
-				DisplayName: "testtoken",
-				Policies:    []string{"root"},
-				TokenType:   logical.TokenTypeService,
-			},
+			&logical.Auth{ClientToken: "foo", Accessor: "bar", DisplayName: "testtoken", Policies: []string{"root"}},
 			&logical.Request{
 				Operation: logical.UpdateOperation,
 				Path:      "/foo",
@@ -104,7 +91,7 @@ func TestFormatJSON_formatRequest(t *testing.T) {
 			Request:  tc.Req,
 			OuterErr: tc.Err,
 		}
-		if err := formatter.FormatRequest(namespace.RootContext(nil), &buf, config, in); err != nil {
+		if err := formatter.FormatRequest(context.Background(), &buf, config, in); err != nil {
 			t.Fatalf("bad: %s\nerr: %s", name, err)
 		}
 
@@ -117,7 +104,6 @@ func TestFormatJSON_formatRequest(t *testing.T) {
 		if err := jsonutil.DecodeJSON([]byte(expectedResultStr), &expectedjson); err != nil {
 			t.Fatalf("bad json: %s", err)
 		}
-		expectedjson.Request.Namespace = AuditNamespace{ID: "root"}
 
 		var actualjson = new(AuditRequestEntry)
 		if err := jsonutil.DecodeJSON([]byte(buf.String())[len(tc.Prefix):], &actualjson); err != nil {
@@ -139,5 +125,5 @@ func TestFormatJSON_formatRequest(t *testing.T) {
 	}
 }
 
-const testFormatJSONReqBasicStrFmt = `{"time":"2015-08-05T13:45:46Z","type":"request","auth":{"client_token":"%s","accessor":"bar","display_name":"testtoken","policies":["root"],"metadata":null,"entity_id":"","token_type":"service"},"request":{"operation":"update","path":"/foo","data":null,"wrap_ttl":60,"remote_address":"127.0.0.1","headers":{"foo":["bar"]}},"error":"this is an error"}
+const testFormatJSONReqBasicStrFmt = `{"time":"2015-08-05T13:45:46Z","type":"request","auth":{"client_token":"%s","accessor":"bar","display_name":"testtoken","policies":["root"],"metadata":null},"request":{"operation":"update","path":"/foo","data":null,"wrap_ttl":60,"remote_address":"127.0.0.1","headers":{"foo":["bar"]}},"error":"this is an error"}
 `

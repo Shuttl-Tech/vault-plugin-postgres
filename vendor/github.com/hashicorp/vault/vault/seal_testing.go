@@ -3,7 +3,7 @@ package vault
 import (
 	"context"
 
-	testing "github.com/mitchellh/go-testing-interface"
+	"github.com/mitchellh/go-testing-interface"
 )
 
 var (
@@ -16,16 +16,12 @@ type TestSealOpts struct {
 	RecoveryKeysDisabled bool
 }
 
+func NewTestSeal(t testing.T, opts *TestSealOpts) Seal {
+	return NewDefaultSeal()
+}
+
 func testCoreUnsealedWithConfigs(t testing.T, barrierConf, recoveryConf *SealConfig) (*Core, [][]byte, [][]byte, string) {
-	t.Helper()
-	var opts *TestSealOpts
-	if recoveryConf == nil {
-		opts = &TestSealOpts{
-			StoredKeysDisabled:   true,
-			RecoveryKeysDisabled: true,
-		}
-	}
-	seal := NewTestSeal(t, opts)
+	seal := NewTestSeal(t, nil)
 	core := TestCoreWithSeal(t, seal, false)
 	result, err := core.Initialize(context.Background(), &InitParams{
 		BarrierConfig:  barrierConf,
@@ -38,14 +34,18 @@ func testCoreUnsealedWithConfigs(t testing.T, barrierConf, recoveryConf *SealCon
 	if err != nil {
 		t.Fatalf("err: %s", err)
 	}
-	if core.Sealed() {
+	if sealed, _ := core.Sealed(); sealed {
 		for _, key := range result.SecretShares {
 			if _, err := core.Unseal(TestKeyCopy(key)); err != nil {
 				t.Fatalf("unseal err: %s", err)
 			}
 		}
 
-		if core.Sealed() {
+		sealed, err = core.Sealed()
+		if err != nil {
+			t.Fatalf("err checking seal status: %s", err)
+		}
+		if sealed {
 			t.Fatal("should not be sealed")
 		}
 	}
@@ -70,20 +70,18 @@ func TestCoreUnsealedWithConfigSealOpts(t testing.T, barrierConf, recoveryConf *
 	if err != nil {
 		t.Fatalf("err: %s", err)
 	}
-	err = core.UnsealWithStoredKeys(context.Background())
-	if err != nil {
-		t.Fatalf("err: %s", err)
+	for _, key := range result.SecretShares {
+		if _, err := core.Unseal(TestKeyCopy(key)); err != nil {
+			t.Fatalf("unseal err: %s", err)
+		}
 	}
-	if core.Sealed() {
-		for _, key := range result.SecretShares {
-			if _, err := core.Unseal(TestKeyCopy(key)); err != nil {
-				t.Fatalf("unseal err: %s", err)
-			}
-		}
 
-		if core.Sealed() {
-			t.Fatal("should not be sealed")
-		}
+	sealed, err := core.Sealed()
+	if err != nil {
+		t.Fatalf("err checking seal status: %s", err)
+	}
+	if sealed {
+		t.Fatal("should not be sealed")
 	}
 
 	return core, result.SecretShares, result.RecoveryShares, result.RootToken

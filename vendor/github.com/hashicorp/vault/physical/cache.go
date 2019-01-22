@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 
 	log "github.com/hashicorp/go-hclog"
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/hashicorp/golang-lru"
 	"github.com/hashicorp/vault/helper/locksutil"
 	"github.com/hashicorp/vault/helper/pathmanager"
 )
@@ -22,7 +22,6 @@ var cacheExceptionsPaths = []string{
 	"index/pages/",
 	"index-dr/pages/",
 	"sys/expire/",
-	"core/poison-pill",
 }
 
 // Cache is used to wrap an underlying physical backend
@@ -153,7 +152,9 @@ func (c *Cache) Get(ctx context.Context, key string) (*Entry, error) {
 	}
 
 	// Cache the result
-	c.lru.Add(key, ent)
+	if ent != nil {
+		c.lru.Add(key, ent)
+	}
 
 	return ent, nil
 }
