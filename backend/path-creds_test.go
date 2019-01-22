@@ -69,7 +69,7 @@ func TestAccCredsCreate(t *testing.T) {
 
 	hijackT := &T{T: t}
 	logicaltest.Test(hijackT, logicaltest.TestCase{
-		LogicalBackend: backend,
+		Backend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, path.Join("cluster", testCluster), clusterAttr, false),
 			testAccReadClusterConfigVar(t, path.Join("cluster", testCluster), cluster),

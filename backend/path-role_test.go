@@ -18,7 +18,7 @@ func TestAccRole_basic(t *testing.T) {
 	}
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		LogicalBackend: backend,
+		Backend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteRoleConfig(t, "roles/test-acc", roleAttr, false),
 			testAccWriteRoleConfig(t, "roles/test-acc-one", roleAttr, false),

@@ -191,8 +191,8 @@ func New(c *logical.BackendConfig) *backend {
 					},
 				},
 				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.ReadOperation:   b.pathDatabaseRead,
 					logical.UpdateOperation: b.pathDatabaseUpdate,
+					logical.ReadOperation:   b.pathDatabaseRead,
 					logical.DeleteOperation: b.pathDatabaseDelete,
 				},
 				HelpSynopsis:    helpSynopsisDatabase,
@@ -362,7 +362,7 @@ func (b *backend) getConn(ctx context.Context, storage logical.Storage, connT co
 	}
 
 	if entry == nil {
-		return nil, fmt.Errorf("Configuration for %s cluster does not exist", cluster)
+		return nil, fmt.Errorf("configuration for %s cluster does not exist", cluster)
 	}
 
 	c := &ClusterConfig{}

@@ -22,6 +22,6 @@ func main() {
 
 	err := plugin.Serve(opts)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("plugin exited with error: %s", err)
 	}
 }
