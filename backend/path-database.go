@@ -99,50 +99,15 @@ func (b *backend) pathDatabaseUpdate(ctx context.Context, req *logical.Request, 
 		return logical.ErrorResponse(fmt.Sprintf("Database %s is already registered in cluster %s", dn, cn)), nil
 	}
 
-	clusterConn, err := b.getConn(ctx, req.Storage, connTypeRoot, cn, c.Database)
-	if err != nil {
-		return nil, err
+	objectsOwner := data.Get("objects_owner_role").(string)
+	if objectsOwner == "" {
+		objectsOwner = fmt.Sprintf("%s_objects_owner", dn)
 	}
 
-	dbQV := map[string]string{
-		"database": pq.QuoteIdentifier(dn),
-	}
-
-	err = dbtxn.ExecuteDBQuery(ctx, clusterConn, dbQV, queryCreateDb)
-	if err != nil {
-		return nil, err
-	}
-
-	dbConn, err := b.getConn(ctx, req.Storage, connTypeMgmt, cn, dn)
-	if err != nil {
-		return nil, err
-	}
-
-	objectsOwner := fmt.Sprintf("%s_objects_owner", dn)
-
-	rQV := map[string]string{
-		"role_name":             pq.QuoteIdentifier(objectsOwner),
-		"role_group_management": pq.QuoteIdentifier(c.ManagementRole),
-		"role_group_root":       pq.QuoteIdentifier(c.Username),
-	}
-
-	tx, err := dbConn.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
-
-	qSetupRole := []string{queryCreateObjectsOwnerRole, queryGrantAll}
-	for _, q := range qSetupRole {
-		if err = dbtxn.ExecuteTxQuery(ctx, tx, rQV, q); err != nil {
+	if data.Get("initialize").(bool) {
+		if err = initializeDb(ctx, req.Storage, b, c, cn, dn, objectsOwner); err != nil {
 			return nil, err
 		}
-	}
-
-	if err = tx.Commit(); err != nil {
-		return nil, err
 	}
 
 	dbC := &DbConfig{
@@ -157,6 +122,50 @@ func (b *backend) pathDatabaseUpdate(ctx context.Context, req *logical.Request, 
 	}
 
 	return &logical.Response{}, nil
+}
+
+func initializeDb(ctx context.Context, storage logical.Storage, b *backend, c *ClusterConfig, cn, dn, objectsOwner string) error {
+	clusterConn, err := b.getConn(ctx, storage, connTypeRoot, cn, c.Database)
+	if err != nil {
+		return err
+	}
+
+	dbQV := map[string]string{
+		"database": pq.QuoteIdentifier(dn),
+	}
+
+	err = dbtxn.ExecuteDBQuery(ctx, clusterConn, dbQV, queryCreateDb)
+	if err != nil {
+		return err
+	}
+
+	dbConn, err := b.getConn(ctx, storage, connTypeMgmt, cn, dn)
+	if err != nil {
+		return err
+	}
+
+	rQV := map[string]string{
+		"role_name":             pq.QuoteIdentifier(objectsOwner),
+		"role_group_management": pq.QuoteIdentifier(c.ManagementRole),
+		"role_group_root":       pq.QuoteIdentifier(c.Username),
+	}
+
+	tx, err := dbConn.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	qSetupRole := []string{queryCreateObjectsOwnerRole, queryGrantAll}
+	for _, q := range qSetupRole {
+		if err = dbtxn.ExecuteTxQuery(ctx, tx, rQV, q); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func storeDbEntry(ctx context.Context, storage logical.Storage, clusterName, dbName string, db *DbConfig) error {
