@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/hashicorp/go-sockaddr"
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/vault/helper/dbtxn"
 	"github.com/hashicorp/vault/logical"
@@ -60,10 +59,6 @@ func (c *ClusterConfig) Disable() {
 func (c *ClusterConfig) validate() error {
 	if c.Host == "" {
 		return fmt.Errorf("Invalid host value")
-	}
-
-	if _, err := sockaddr.NewSockAddr(c.Host); err != nil {
-		return fmt.Errorf("Invalid host value. error: %s", err)
 	}
 
 	if c.Port < 1 || c.Port > 65535 {
