@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/vault/helper/dbtxn"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
@@ -101,11 +102,21 @@ func (b *backend) pathDatabaseUpdate(ctx context.Context, req *logical.Request, 
 
 	objectsOwner := data.Get("objects_owner_role").(string)
 	if objectsOwner == "" {
-		objectsOwner = fmt.Sprintf("%s_objects_owner", dn)
+		objOwnId, err := uuid.GenerateUUID()
+		if err != nil {
+			return nil, err
+		}
+
+		objectsOwner = fmt.Sprintf("v-objown-%s-%s", dn, objOwnId)
+	}
+
+	if len(objectsOwner) > 63 {
+		objectsOwner = objectsOwner[:63]
 	}
 
 	if data.Get("initialize").(bool) {
-		if err = initializeDb(ctx, req.Storage, b, c, cn, dn, objectsOwner); err != nil {
+		createNewDb := data.Get("create_db").(bool)
+		if err = initializeDb(ctx, req.Storage, b, c, cn, dn, objectsOwner, createNewDb); err != nil {
 			return nil, err
 		}
 	}
@@ -124,7 +135,7 @@ func (b *backend) pathDatabaseUpdate(ctx context.Context, req *logical.Request, 
 	return &logical.Response{}, nil
 }
 
-func initializeDb(ctx context.Context, storage logical.Storage, b *backend, c *ClusterConfig, cn, dn, objectsOwner string) error {
+func initializeDb(ctx context.Context, storage logical.Storage, b *backend, c *ClusterConfig, cn, dn, objectsOwner string, createNewDb bool) error {
 	clusterConn, err := b.getConn(ctx, storage, connTypeRoot, cn, c.Database)
 	if err != nil {
 		return err
@@ -134,9 +145,11 @@ func initializeDb(ctx context.Context, storage logical.Storage, b *backend, c *C
 		"database": pq.QuoteIdentifier(dn),
 	}
 
-	err = dbtxn.ExecuteDBQuery(ctx, clusterConn, dbQV, queryCreateDb)
-	if err != nil {
-		return err
+	if createNewDb {
+		err = dbtxn.ExecuteDBQuery(ctx, clusterConn, dbQV, queryCreateDb)
+		if err != nil {
+			return err
+		}
 	}
 
 	dbConn, err := b.getConn(ctx, storage, connTypeMgmt, cn, dn)
