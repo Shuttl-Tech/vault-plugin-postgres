@@ -195,7 +195,12 @@ func New(c *logical.BackendConfig) *backend {
 					},
 					"initialize": {
 						Type:        framework.TypeBool,
-						Description: "If true vault will create the database and necessary roles in cluster",
+						Description: "If true vault will create necessary roles in cluster",
+						Default:     true,
+					},
+					"create_db": {
+						Type:        framework.TypeBool,
+						Description: "If true vault will create new database in cluster",
 						Default:     true,
 					},
 				},

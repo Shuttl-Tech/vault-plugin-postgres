@@ -18,18 +18,19 @@ func TestAccDatabaseCreate_basic(t *testing.T) {
 
 	cluster := &ClusterConfig{}
 	expectAttr := map[string]interface{}{
-		"cluster":       "test-acc-db",
-		"database":      "test-db",
-		"objects_owner": "test-db_objects_owner",
-		"disabled":      false,
+		"cluster":  "test-acc-db",
+		"database": "test-db",
+		"disabled": false,
 	}
+
+	expectKeys := []string{"objects_owner"}
 
 	logicaltest.Test(t, logicaltest.TestCase{
 		Backend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/test-acc-db", attr, false),
 			testAccWriteDbConfig(t, "cluster/test-acc-db/test-db"),
-			testAccReadDbConfig(t, "cluster/test-acc-db/test-db", expectAttr, nil, false),
+			testAccReadDbConfig(t, "cluster/test-acc-db/test-db", expectAttr, expectKeys, false),
 			testAccReadClusterConfigVar(t, "cluster/test-acc-db", cluster),
 			testAccValidateDbInit(t, "cluster/test-acc-db/test-db", cluster),
 			testAccDeleteDbConfig(t, "cluster/test-acc-db/test-db"),

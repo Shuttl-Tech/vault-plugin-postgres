@@ -170,8 +170,13 @@ func updatePassword(ctx context.Context, db *sql.DB, username string) (string, e
 	return newPass, nil
 }
 
-func createManagementRole(ctx context.Context, db *sql.DB, name string) (string, string, error) {
-	roleName := fmt.Sprintf("v-manage-%s", name)
+func createManagementRole(ctx context.Context, db *sql.DB) (string, string, error) {
+	mgmtRoleName, err := uuid.GenerateUUID()
+	if err != nil {
+		return "", "", err
+	}
+
+	roleName := fmt.Sprintf("v-manage-%s", mgmtRoleName)
 	if len(roleName) > 63 {
 		roleName = roleName[:63]
 	}
@@ -240,7 +245,7 @@ func (b *backend) pathClusterUpdate(ctx context.Context, req *logical.Request, d
 		_ = db.Close()
 	}()
 
-	mgmtRole, mgmtPass, err := createManagementRole(ctx, db, clusterName)
+	mgmtRole, mgmtPass, err := createManagementRole(ctx, db)
 	if err != nil {
 		return nil, err
 	}
