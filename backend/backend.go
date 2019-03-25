@@ -89,7 +89,15 @@ func New(c *logical.BackendConfig) *backend {
 				HelpDescription: helpDescriptionInfo,
 			},
 			{
-				Pattern: "cluster/" + framework.GenericNameRegex("cluster"),
+				Pattern: "cluster/?$",
+				Callbacks: map[logical.Operation]framework.OperationFunc{
+					logical.ListOperation: b.pathClustersList,
+				},
+				HelpSynopsis:    helpSynopsisListClusters,
+				HelpDescription: helpDescriptionListClusters,
+			},
+			{
+				Pattern: "cluster/" + framework.GenericNameRegex("cluster") + "/?$",
 				Fields: map[string]*framework.FieldSchema{
 					"cluster": {
 						Type:        framework.TypeString,
@@ -142,6 +150,7 @@ func New(c *logical.BackendConfig) *backend {
 					logical.ReadOperation:   b.pathClusterRead,
 					logical.UpdateOperation: b.pathClusterUpdate,
 					logical.DeleteOperation: b.pathClusterDelete,
+					logical.ListOperation:   b.pathDatabasesList,
 				},
 				HelpSynopsis:    helpSynopsisCluster,
 				HelpDescription: helpDescriptionCluster,
