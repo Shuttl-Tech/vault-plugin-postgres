@@ -29,9 +29,8 @@ GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 
 # Default os-arch combination to build
-XC_OS ?= darwin linux windows
-XC_ARCH ?= 386 amd64 arm
-XC_EXCLUDE ?= darwin/arm windows/arm
+XC_OS ?= darwin linux
+XC_ARCH ?= amd64
 
 # GPG Signing key (blank by default, means no GPG signing)
 GPG_KEY ?=
@@ -51,9 +50,6 @@ TEST ?= ./...
 # meta target (build) for compiling everything.
 define make-xc-target
   $1/$2:
-  ifneq (,$(findstring ${1}/${2},$(XC_EXCLUDE)))
-		@printf "%s%20s %s\n" "-->" "${1}/${2}:" "${PROJECT} (excluded)"
-  else
 		@printf "%s%20s %s\n" "-->" "${1}/${2}:" "${PROJECT}"
 		@docker run \
 			--interactive \
@@ -68,10 +64,9 @@ define make-xc-target
 				GOARCH="${2}" \
 				go build \
 				  -a \
-					-o="pkg/${NAME}${3}_${1}_${2}" \
+					-o="pkg/${NAME}_${1}_${2}" \
 					-ldflags "${LD_FLAGS}" \
 					-tags "${GOTAGS}"
-  endif
   .PHONY: $1/$2
 
   $1:: $1/$2
@@ -80,7 +75,7 @@ define make-xc-target
   build:: $1/$2
   .PHONY: build
 endef
-$(foreach goarch,$(XC_ARCH),$(foreach goos,$(XC_OS),$(eval $(call make-xc-target,$(goos),$(goarch),$(if $(findstring windows,$(goos)),.exe,)))))
+$(foreach goarch,$(XC_ARCH),$(foreach goos,$(XC_OS),$(eval $(call make-xc-target,$(goos),$(goarch)))))
 
 # bootstrap installs the necessary go tools for development or build.
 bootstrap:
