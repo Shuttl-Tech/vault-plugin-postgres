@@ -39,6 +39,42 @@ func TestAccDatabaseCreate_basic(t *testing.T) {
 	})
 }
 
+func TestAccDatabasesList(t *testing.T) {
+	backend := testGetBackend(t)
+	cleanup, attr := prepareTestContainer(t)
+	defer cleanup()
+
+	logicaltest.Test(t, logicaltest.TestCase{
+		Backend: backend,
+		Steps: []logicaltest.TestStep{
+			testAccWriteClusterConfig(t, "cluster/test-acc-db", attr, false),
+			testAccWriteDbConfig(t, "cluster/test-acc-db/test-db-one"),
+			testAccWriteDbConfig(t, "cluster/test-acc-db/test-db-two"),
+			testAccListDatabases(t, "test-acc-db", "test-db-one", "test-db-two"),
+		},
+	})
+}
+
+func testAccListDatabases(t *testing.T, cluster string, dbs ...string) logicaltest.TestStep {
+	return logicaltest.TestStep{
+		Operation: logical.ListOperation,
+		Path:      "cluster/" + cluster,
+		ErrorOk:   false,
+		Check: func(resp *logical.Response) error {
+			keys, ok := resp.Data["keys"]
+			if !ok {
+				return fmt.Errorf("expected keys attributes to exist in response")
+			}
+
+			if !reflect.DeepEqual(keys, dbs) {
+				return fmt.Errorf("expected keys %+v, got %+v", dbs, keys)
+			}
+
+			return nil
+		},
+	}
+}
+
 func testAccDeleteDbConfig(t *testing.T, name string) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.DeleteOperation,

@@ -46,6 +46,24 @@ func TestBackend_cluster_basic(t *testing.T) {
 	})
 }
 
+func TestBackend_cluster_list(t *testing.T) {
+	backend := testGetBackend(t)
+	cleanup1, attr1 := prepareTestContainer(t)
+	defer cleanup1()
+
+	cleanup2, attr2 := prepareTestContainer(t)
+	defer cleanup2()
+
+	logicaltest.Test(t, logicaltest.TestCase{
+		Backend: backend,
+		Steps: []logicaltest.TestStep{
+			testAccWriteClusterConfig(t, "cluster/test-acc-cluster-one", attr1, false),
+			testAccWriteClusterConfig(t, "cluster/test-acc-cluster-two", attr2, false),
+			testAccListClusters(t, "test-acc-cluster-one", "test-acc-cluster-two"),
+		},
+	})
+}
+
 func TestBackend_cluster_init(t *testing.T) {
 	backend := testGetBackend(t)
 	cleanup, attr := prepareTestContainer(t)
@@ -186,6 +204,26 @@ func testAccDeleteClusterConfig(t *testing.T, target string, expectError bool) l
 				return checkErrResponse(resp)
 			} else if resp != nil && resp.IsError() {
 				return fmt.Errorf("got an error response: %v", resp.Error())
+			}
+
+			return nil
+		},
+	}
+}
+
+func testAccListClusters(t *testing.T, clusters ...string) logicaltest.TestStep {
+	return logicaltest.TestStep{
+		Operation: logical.ListOperation,
+		Path:      "cluster/",
+		ErrorOk:   false,
+		Check: func(resp *logical.Response) error {
+			keys, ok := resp.Data["keys"]
+			if !ok {
+				return fmt.Errorf("expected keys attribute to exist in response")
+			}
+
+			if !reflect.DeepEqual(clusters, keys) {
+				return fmt.Errorf("expected keys %+v, got %+v", clusters, keys)
 			}
 
 			return nil

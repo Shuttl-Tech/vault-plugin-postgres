@@ -292,3 +292,13 @@ func (b *backend) pathDatabaseRead(ctx context.Context, req *logical.Request, da
 		Data: dbC.AsMap(),
 	}, nil
 }
+
+func (b *backend) pathDatabasesList(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	cluster := data.Get("cluster").(string)
+	entries, err := req.Storage.List(ctx, PathDatabase.For(cluster, ""))
+	if err != nil {
+		return nil, err
+	}
+
+	return logical.ListResponse(entries), nil
+}

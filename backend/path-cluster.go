@@ -315,6 +315,15 @@ func (b *backend) pathClusterDelete(ctx context.Context, req *logical.Request, d
 	}, nil
 }
 
+func (b *backend) pathClustersList(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	entries, err := req.Storage.List(ctx, PathCluster.For(""))
+	if err != nil {
+		return nil, err
+	}
+
+	return logical.ListResponse(entries), nil
+}
+
 func (b *backend) makeConn(dsn string) (*sql.DB, error) {
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
