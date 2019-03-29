@@ -18,6 +18,7 @@ const (
 	PathCluster  Path = "config/cluster/%s"
 	PathDatabase Path = "config/cluster/%s/database/%s"
 	PathRole     Path = "config/role/%s"
+	PathMeta     Path = "meta/%s"
 )
 
 const (
@@ -87,6 +88,46 @@ func New(c *logical.BackendConfig) *backend {
 				},
 				HelpSynopsis:    helpSynopsisInfo,
 				HelpDescription: helpDescriptionInfo,
+			},
+			{
+				Pattern: "metadata/?$",
+				Fields: map[string]*framework.FieldSchema{
+					"cluster": {
+						Type:        framework.TypeString,
+						Description: "Name of the cluster",
+					},
+					"database": {
+						Type:        framework.TypeString,
+						Description: "Name of the database",
+					},
+					"type": {
+						Type:        framework.TypeString,
+						Description: "Type of the object to lookup. Must be one of 'cluster' or 'database'",
+					},
+					"data": {
+						Type:        framework.TypeKVPairs,
+						Description: "key-value pairs to associate with the object",
+					},
+				},
+				Callbacks: map[logical.Operation]framework.OperationFunc{
+					logical.UpdateOperation: b.pathMetadataUpdate,
+					logical.ReadOperation:   b.pathMetadataRead,
+					logical.ListOperation:   b.pathMetadataList,
+				},
+				HelpSynopsis:    helpSynopsisMetadata,
+				HelpDescription: helpDescriptionMetadata,
+			},
+			{
+				Pattern: "metadata/(?P<id>.+)",
+				Fields: map[string]*framework.FieldSchema{
+					"id": {
+						Type:        framework.TypeString,
+						Description: "Metadata ID",
+					},
+				},
+				Callbacks: map[logical.Operation]framework.OperationFunc{
+					logical.DeleteOperation: b.pathMetadataDelete,
+				},
 			},
 			{
 				Pattern: "cluster/?$",
