@@ -128,6 +128,7 @@ func New(c *logical.BackendConfig) *backend {
 				Callbacks: map[logical.Operation]framework.OperationFunc{
 					logical.DeleteOperation: b.pathMetadataDelete,
 				},
+				HelpSynopsis: "Delete metadata using ID",
 			},
 			{
 				Pattern: "cluster/?$",
