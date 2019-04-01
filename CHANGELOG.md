@@ -1,3 +1,7 @@
+# 0.1.5
+ - metadata: Added new metadata path to associate arbitrary key-value data
+   with clusters and databases.
+
 # 0.1.4
  - cluster/list: Added the path to list all registered clusters
  - database/list: Added the path to list all registered databases in a cluster
