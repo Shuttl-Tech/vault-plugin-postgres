@@ -9,7 +9,7 @@ function fmt_header {
   sed -e 's/^\(Request\)/    &/' -e 's/^\(Matching Route\)/    &/'
 }
 
-vault path-help pg-cluster/                     | fmt_header > docs/backend.md
+vault path-help pg-cluster/                     | fmt_header > docs/index.md
 vault path-help pg-cluster/info                 | fmt_header > docs/info.md
 vault path-help pg-cluster/clone/name           | fmt_header > docs/clone.md
 vault path-help pg-cluster/cluster              | fmt_header > docs/cluster.md
