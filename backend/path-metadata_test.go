@@ -108,12 +108,12 @@ func testAccWriteDbMetadata(t *testing.T, cluster, db string, meta map[string]in
 	}
 }
 
-func testAccFindClusterMatch(t *testing.T,  matcher map[string]interface{}, expect interface{}) logicaltest.TestStep {
+func testAccFindClusterMatch(t *testing.T, matcher map[string]interface{}, expect interface{}) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.ReadOperation,
 		Path:      "metadata",
 		ErrorOk:   false,
-		Data:      map[string]interface{}{
+		Data: map[string]interface{}{
 			"type": "cluster",
 			"data": matcher,
 		},
@@ -133,7 +133,7 @@ func testAccFindDbMatch(t *testing.T, matcher map[string]interface{}, expect int
 		Operation: logical.ReadOperation,
 		Path:      "metadata",
 		ErrorOk:   false,
-		Data:      map[string]interface{}{
+		Data: map[string]interface{}{
 			"type": "database",
 			"data": matcher,
 		},
@@ -165,11 +165,10 @@ func testAccListMetadata(t *testing.T, expect []string) logicaltest.TestStep {
 	}
 }
 
-
 func testAccDeleteMeta(t *testing.T, id string) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.DeleteOperation,
-		Path:      "metadata/"+id,
+		Path:      "metadata/" + id,
 		ErrorOk:   false,
 	}
 }

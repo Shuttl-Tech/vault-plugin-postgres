@@ -86,8 +86,8 @@ func (b *backend) pathMetadataUpdate(ctx context.Context, req *logical.Request, 
 	}
 
 	entry := &Metadata{
-		Cluster:  cluster.(string),
-		Data:     meta,
+		Cluster: cluster.(string),
+		Data:    meta,
 	}
 
 	if database != nil {
