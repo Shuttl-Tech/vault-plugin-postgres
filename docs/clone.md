@@ -1,5 +1,5 @@
-Request:        clone/name
-Matching Route: ^clone/(?P<cluster>\w(([\w-.]+)?\w)?)$
+    Request:        clone/name
+    Matching Route: ^clone/(?P<cluster>\w(([\w-.]+)?\w)?)$
 
 Use existing cluster configuration to configure a new cluster.
 

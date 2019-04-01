@@ -1,5 +1,5 @@
-Request:        creds/c/d/r
-Matching Route: ^creds/(?P<cluster>\w(([\w-.]+)?\w)?)/(?P<database>\w(([\w-.]+)?\w)?)/(?P<role>\w(([\w-.]+)?\w)?)$
+    Request:        creds/c/d/r
+    Matching Route: ^creds/(?P<cluster>\w(([\w-.]+)?\w)?)/(?P<database>\w(([\w-.]+)?\w)?)/(?P<role>\w(([\w-.]+)?\w)?)$
 
 Generate temporary credential pair against a role and database.
 

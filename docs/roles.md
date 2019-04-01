@@ -1,5 +1,5 @@
-Request:        roles/name
-Matching Route: ^roles/(?P<name>\w(([\w-.]+)?\w)?)$
+    Request:        roles/name
+    Matching Route: ^roles/(?P<name>\w(([\w-.]+)?\w)?)$
 
 Write, Read and Delete roles
 
@@ -32,8 +32,8 @@ lease renewal. All active lease on a role will be revoked on expiry.
 
 ---
 
-Request:        roles
-Matching Route: ^roles/?$
+    Request:        roles
+    Matching Route: ^roles/?$
 
 List the names of all registered roles
 

@@ -13,17 +13,26 @@ you may or may not be able to access certain paths.
     ^clone/(?P<cluster>\w(([\w-.]+)?\w)?)$
         Use existing cluster configuration to configure a new cluster.
 
-    ^cluster/(?P<cluster>\w(([\w-.]+)?\w)?)$
-        Write, Read and Delete cluster configuration.
-
     ^cluster/(?P<cluster>\w(([\w-.]+)?\w)?)/(?P<database>\w(([\w-.]+)?\w)?)$
         Write, Read and Delete database configuration.
+
+    ^cluster/(?P<cluster>\w(([\w-.]+)?\w)?)/?$
+        Write, Read and Delete cluster configuration.
+
+    ^cluster/?$
+        List the names of all clusters that have been registered so far
 
     ^creds/(?P<cluster>\w(([\w-.]+)?\w)?)/(?P<database>\w(([\w-.]+)?\w)?)/(?P<role>\w(([\w-.]+)?\w)?)$
         Generate temporary credential pair against a role and database.
 
     ^info$
         Returns the build information about the plugin.
+
+    ^metadata/(?P<id>.+)$
+        Delete metadata using ID
+
+    ^metadata/?$
+        Attach arbitrary key-value pairs to cluster or database object
 
     ^roles/(?P<name>\w(([\w-.]+)?\w)?)$
         Write, Read and Delete roles

@@ -1,5 +1,5 @@
-Request:        cluster/c/database
-Matching Route: ^cluster/(?P<cluster>\w(([\w-.]+)?\w)?)/(?P<database>\w(([\w-.]+)?\w)?)$
+    Request:        cluster/c/database
+    Matching Route: ^cluster/(?P<cluster>\w(([\w-.]+)?\w)?)/(?P<database>\w(([\w-.]+)?\w)?)$
 
 Write, Read and Delete database configuration.
 
@@ -8,8 +8,17 @@ Write, Read and Delete database configuration.
     cluster (string)
         Name of the cluster in which the new database will be created
 
+    create_db (bool)
+        If true vault will create new database in cluster
+
     database (string)
         Name of the new database to create
+
+    initialize (bool)
+        If true vault will create necessary roles in cluster
+
+    objects_owner_role (string)
+        Role that will own all objects in this database
 
 ## DESCRIPTION
 

@@ -1,5 +1,5 @@
-Request:        info
-Matching Route: ^info$
+    Request:        info
+    Matching Route: ^info$
 
 Returns the build information about the plugin.
 
