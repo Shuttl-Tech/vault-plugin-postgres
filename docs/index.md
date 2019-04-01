@@ -39,3 +39,15 @@ you may or may not be able to access certain paths.
 
     ^roles/?$
         List the names of all registered roles
+
+
+### TOC
+
+ - [clone](./docs/clone.md)
+ - [cluster](./docs/cluster.md)
+ - [creds](./docs/creds.md)
+ - [database](./docs/database.md)
+ - [index](./docs/index.md)
+ - [info](./docs/info.md)
+ - [metadata](./docs/metadata.md)
+ - [roles](./docs/roles.md)

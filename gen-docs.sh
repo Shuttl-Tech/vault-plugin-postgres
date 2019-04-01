@@ -21,3 +21,15 @@ echo -e "\n---\n"                                            >> docs/roles.md
 vault path-help pg-cluster/roles                | fmt_header >> docs/roles.md
 vault path-help pg-cluster/creds/c/d/r          | fmt_header > docs/creds.md
 vault path-help pg-cluster/metadata             | fmt_header > docs/metadata.md
+
+declare -a toc
+
+for docname in docs/*.md; do
+  titlef=$(basename "${docname}")
+  toc+=(" - [${titlef%.md}](./${docname})")
+done
+
+for docf in docs/*.md; do
+  echo -e "\n\n### TOC\n" >> "${docf}"
+  printf "%s\n" "${toc[@]}" >> "${docf}"
+done

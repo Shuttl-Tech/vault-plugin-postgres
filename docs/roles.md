@@ -41,3 +41,15 @@ List the names of all registered roles
 ## DESCRIPTION
 
 <no description>
+
+
+### TOC
+
+ - [clone](./docs/clone.md)
+ - [cluster](./docs/cluster.md)
+ - [creds](./docs/creds.md)
+ - [database](./docs/database.md)
+ - [index](./docs/index.md)
+ - [info](./docs/info.md)
+ - [metadata](./docs/metadata.md)
+ - [roles](./docs/roles.md)

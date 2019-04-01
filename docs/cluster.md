@@ -69,3 +69,15 @@ lease will be revoked on expiry.
 
 Listing this endpoint lists all active or deleted databases that have been
 registered in the cluster so far.
+
+
+### TOC
+
+ - [clone](./docs/clone.md)
+ - [cluster](./docs/cluster.md)
+ - [creds](./docs/creds.md)
+ - [database](./docs/database.md)
+ - [index](./docs/index.md)
+ - [info](./docs/info.md)
+ - [metadata](./docs/metadata.md)
+ - [roles](./docs/roles.md)

@@ -39,3 +39,15 @@ When reading from metadata endpoint "lookup" attribute is required and must be s
 you can perform lookups using a subset of metadata but not using a superset.
 
 Listing metadata endpoint returns a map from object identifier to map of key-values.
+
+
+### TOC
+
+ - [clone](./docs/clone.md)
+ - [cluster](./docs/cluster.md)
+ - [creds](./docs/creds.md)
+ - [database](./docs/database.md)
+ - [index](./docs/index.md)
+ - [info](./docs/info.md)
+ - [metadata](./docs/metadata.md)
+ - [roles](./docs/roles.md)

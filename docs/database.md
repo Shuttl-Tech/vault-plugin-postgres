@@ -38,3 +38,15 @@ or a database that exists in deleted cluster.
 Deleting a database does not drop the actual resource. Vault still retains the
 configuration for all deleted databases but prevents any new operation or lease
 renewal on it.
+
+
+### TOC
+
+ - [clone](./docs/clone.md)
+ - [cluster](./docs/cluster.md)
+ - [creds](./docs/creds.md)
+ - [database](./docs/database.md)
+ - [index](./docs/index.md)
+ - [info](./docs/info.md)
+ - [metadata](./docs/metadata.md)
+ - [roles](./docs/roles.md)

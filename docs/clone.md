@@ -29,3 +29,15 @@ snapshot restores or database cloning features provided by most cloud providers.
 Cloning a cluster will first use the source credentials to validate the connection
 with clone endpoint and, if successful, will rotate the password for both root
 and management user. All the other details are kept intact.
+
+
+### TOC
+
+ - [clone](./docs/clone.md)
+ - [cluster](./docs/cluster.md)
+ - [creds](./docs/creds.md)
+ - [database](./docs/database.md)
+ - [index](./docs/index.md)
+ - [info](./docs/info.md)
+ - [metadata](./docs/metadata.md)
+ - [roles](./docs/roles.md)

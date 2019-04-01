@@ -29,3 +29,15 @@ response warning rather than an error. In any case the lease will be revoked by 
 
 If the 'creation_statements' and 'revocation_statements' parameters are left empty then
 the plugin will use following queries to create and drop users.
+
+
+### TOC
+
+ - [clone](./docs/clone.md)
+ - [cluster](./docs/cluster.md)
+ - [creds](./docs/creds.md)
+ - [database](./docs/database.md)
+ - [index](./docs/index.md)
+ - [info](./docs/info.md)
+ - [metadata](./docs/metadata.md)
+ - [roles](./docs/roles.md)
