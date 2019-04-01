@@ -43,11 +43,11 @@ you may or may not be able to access certain paths.
 
 ### TOC
 
- - [clone](./docs/clone.md)
- - [cluster](./docs/cluster.md)
- - [creds](./docs/creds.md)
- - [database](./docs/database.md)
- - [index](./docs/index.md)
- - [info](./docs/info.md)
- - [metadata](./docs/metadata.md)
- - [roles](./docs/roles.md)
+ - [clone](./clone.md)
+ - [cluster](./cluster.md)
+ - [creds](./creds.md)
+ - [database](./database.md)
+ - [index](./index.md)
+ - [info](./info.md)
+ - [metadata](./metadata.md)
+ - [roles](./roles.md)

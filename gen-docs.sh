@@ -26,7 +26,7 @@ declare -a toc
 
 for docname in docs/*.md; do
   titlef=$(basename "${docname}")
-  toc+=(" - [${titlef%.md}](./${docname})")
+  toc+=(" - [${titlef%.md}](./${titlef})")
 done
 
 for docf in docs/*.md; do
