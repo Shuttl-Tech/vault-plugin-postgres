@@ -58,21 +58,20 @@ func TestAccCredsCreate(t *testing.T) {
 
 	cluster := &ClusterConfig{}
 	testStorage := &logical.InmemStorage{}
+	cb := func(c *ClusterConfig) error {
+		*cluster = *c
+		return storeClusterEntry(context.Background(), testStorage, testCluster, c)
+	}
 
 	// Vault testing framework manages the storage provided to vault core
 	// we want to make sure that if we make any request out of band we get
 	// the data in storage
-	err = storeClusterEntry(context.Background(), testStorage, testCluster, cluster)
-	if err != nil {
-		t.Errorf("failed to store cluster entry in test storage: %s", err)
-	}
-
 	hijackT := &T{T: t}
 	logicaltest.Test(hijackT, logicaltest.TestCase{
 		Backend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, path.Join("cluster", testCluster), clusterAttr, false),
-			testAccReadClusterConfigVar(t, path.Join("cluster", testCluster), cluster),
+			testAccReadClusterConfigCallback(t, path.Join("cluster", testCluster), cb),
 			testAccWriteDbConfig(t, path.Join("cluster", testCluster, testDb)),
 			testAccReadDbConfigCopy(t, path.Join("cluster", testCluster, testDb), testStorage),
 			testAccWriteRoleConfig(t, path.Join("roles", testRole), rolesAttr, false),

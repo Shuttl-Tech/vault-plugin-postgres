@@ -134,6 +134,27 @@ func testAccReadClusterConfigVar(t *testing.T, name string, target *ClusterConfi
 	}
 }
 
+func testAccReadClusterConfigCallback(t *testing.T, name string, cb func(*ClusterConfig) error) logicaltest.TestStep {
+	return logicaltest.TestStep{
+		Operation: logical.ReadOperation,
+		Path:      name,
+		ErrorOk:   false,
+		Check: func(resp *logical.Response) error {
+			if resp.IsError() {
+				return resp.Error()
+			}
+
+			ce := &ClusterConfig{}
+			err := mapstructure.Decode(resp.Data, ce)
+			if err != nil {
+				return err
+			}
+
+			return cb(ce)
+		},
+	}
+}
+
 func testAccWriteDbConfig(t *testing.T, target string) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.CreateOperation,

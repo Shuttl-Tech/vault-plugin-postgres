@@ -221,7 +221,6 @@ func (b *backend) pathClusterRead(ctx context.Context, req *logical.Request, dat
 
 func (b *backend) pathClusterUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	clusterName := data.Get("cluster").(string)
-	configName := PathCluster.For(clusterName)
 	existing, err := loadClusterEntry(ctx, req.Storage, clusterName)
 	if err != nil && err != ErrNotFound {
 		return nil, err
@@ -269,17 +268,11 @@ func (b *backend) pathClusterUpdate(ctx context.Context, req *logical.Request, d
 	resp.AddWarning("The password has been changed by Vault. Old password will no longer work")
 	resp.AddWarning(fmt.Sprintf("A management role with name '%s' has been created by Vault", mgmtRole))
 
-	err = b.flushConn(configName)
-	if err != nil {
-		resp.AddWarning("Failed to flush existing connections after update. error: " + err.Error())
-	}
-
 	return resp, nil
 }
 
 func (b *backend) pathClusterDelete(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	clusterName := data.Get("cluster").(string)
-	configName := PathCluster.For(clusterName)
 
 	c, err := loadClusterEntry(ctx, req.Storage, clusterName)
 	if err == ErrNotFound {
@@ -303,11 +296,6 @@ func (b *backend) pathClusterDelete(ctx context.Context, req *logical.Request, d
 
 	warnings := []string{
 		"Use gc/cluster to manage deleted clusters",
-	}
-
-	err = b.flushAllConn(configName)
-	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("Failed to revoke active connections. error: %s", err))
 	}
 
 	return &logical.Response{

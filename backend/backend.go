@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
-	"strings"
-	"sync"
 	"time"
 )
 
@@ -40,9 +38,6 @@ func (p Path) For(n ...interface{}) string {
 
 type backend struct {
 	*framework.Backend
-
-	db map[string]*sql.DB
-	sync.Mutex
 }
 
 func Factory(ctx context.Context, c *logical.BackendConfig) (logical.Backend, error) {
@@ -54,9 +49,7 @@ func Factory(ctx context.Context, c *logical.BackendConfig) (logical.Backend, er
 }
 
 func New(c *logical.BackendConfig) *backend {
-	b := backend{
-		db: map[string]*sql.DB{},
-	}
+	b := backend{}
 
 	b.Backend = &framework.Backend{
 		BackendType: logical.TypeLogical,
@@ -336,55 +329,6 @@ func New(c *logical.BackendConfig) *backend {
 	return &b
 }
 
-func (b *backend) flushConn(name string) error {
-	b.Lock()
-	defer b.Unlock()
-
-	conn, ok := b.db[name]
-	if !ok {
-		return nil
-	}
-
-	err := conn.Close()
-	delete(b.db, name)
-	return err
-}
-
-// flush all connections for a cluster.
-// this function will close all active connections on
-// matching root or management connection prefix and delete
-// the entries from connection pool
-func (b *backend) flushAllConn(name string) error {
-	rootConnPrefix := fmt.Sprintf("%s/%s", connTypeRoot.String(), name)
-	mgmtConnPrefix := fmt.Sprintf("%s/%s", connTypeMgmt.String(), name)
-
-	var (
-		d, e []string
-	)
-
-	b.Lock()
-	defer b.Unlock()
-
-	for k, conn := range b.db {
-		if strings.HasPrefix(k, rootConnPrefix) || strings.HasPrefix(k, mgmtConnPrefix) {
-			d = append(d, k)
-			if err := conn.Close(); err != nil {
-				e = append(e, err.Error())
-			}
-		}
-	}
-
-	for _, k := range d {
-		delete(b.db, k)
-	}
-
-	if len(e) > 0 {
-		return fmt.Errorf("%s", strings.Join(e, "\n"))
-	}
-
-	return nil
-}
-
 type connType int
 
 func (c connType) String() string {
@@ -404,23 +348,6 @@ const (
 )
 
 func (b *backend) getConn(ctx context.Context, storage logical.Storage, connT connType, cluster, db string) (*sql.DB, error) {
-	var confPath string
-	if db == "" {
-		confPath = PathDatabase.For(cluster, db)
-	} else {
-		confPath = PathCluster.For(cluster)
-	}
-
-	confPath = fmt.Sprintf("%s/%s", connT.String(), confPath)
-
-	b.Lock()
-	conn, ok := b.db[confPath]
-	b.Unlock()
-
-	if ok {
-		return conn, nil
-	}
-
 	entry, err := storage.Get(ctx, PathCluster.For(cluster))
 	if err != nil {
 		return nil, err
@@ -443,7 +370,7 @@ func (b *backend) getConn(ctx context.Context, storage logical.Storage, connT co
 		dsn = c.dsn(connT)
 	}
 
-	conn, err = b.makeConn(dsn)
+	conn, err := b.makeConn(dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -451,10 +378,6 @@ func (b *backend) getConn(ctx context.Context, storage logical.Storage, connT co
 	conn.SetConnMaxLifetime(time.Duration(c.MaxConnectionLifetime) * time.Second)
 	conn.SetMaxIdleConns(c.MaxIdleConnections)
 	conn.SetMaxOpenConns(c.MaxOpenConnections)
-
-	b.Lock()
-	b.db[confPath] = conn
-	b.Unlock()
 
 	return conn, nil
 }
