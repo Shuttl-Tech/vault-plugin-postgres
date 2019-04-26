@@ -243,13 +243,7 @@ func (b *backend) pathDatabaseDelete(ctx context.Context, req *logical.Request, 
 		return nil, err
 	}
 
-	resp := &logical.Response{}
-	err = b.flushAllConn(PathDatabase.For(cn, dn))
-	if err != nil {
-		resp.AddWarning(fmt.Sprintf("failed to flush active connections: %s", err.Error()))
-	}
-
-	return resp, nil
+	return &logical.Response{}, nil
 }
 
 func (b *backend) pathDatabaseRead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
