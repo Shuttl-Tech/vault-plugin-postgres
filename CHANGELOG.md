@@ -1,3 +1,6 @@
+#0.1.6
+ - Remove *sql.DB resource caching and create fresh connections when needed
+ 
 # 0.1.5
  - metadata: Added new metadata path to associate arbitrary key-value data
    with clusters and databases.
