@@ -50,15 +50,15 @@ func TestAccDatabasesList(t *testing.T) {
 			testAccWriteClusterConfig(t, "cluster/test-acc-db", attr, false),
 			testAccWriteDbConfig(t, "cluster/test-acc-db/test-db-one"),
 			testAccWriteDbConfig(t, "cluster/test-acc-db/test-db-two"),
-			testAccListDatabases(t, "test-acc-db", "test-db-one", "test-db-two"),
+			testAccListDatabases(t, "cluster/test-acc-db", "test-db-one", "test-db-two"),
 		},
 	})
 }
 
-func testAccListDatabases(t *testing.T, cluster string, dbs ...string) logicaltest.TestStep {
+func testAccListDatabases(t *testing.T, target string, dbs ...string) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.ListOperation,
-		Path:      "cluster/" + cluster,
+		Path:      target,
 		ErrorOk:   false,
 		Check: func(resp *logical.Response) error {
 			keys, ok := resp.Data["keys"]
@@ -83,11 +83,11 @@ func testAccDeleteDbConfig(t *testing.T, name string) logicaltest.TestStep {
 	}
 }
 
-func testAccReadDbConfig(t *testing.T, name string, expect map[string]interface{}, expectKeys []string, expectErr bool) logicaltest.TestStep {
+func testAccReadDbConfig(t *testing.T, target string, expect map[string]interface{}, expectKeys []string, expectErr bool) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.ReadOperation,
-		Path:      name,
-		ErrorOk:   expectErr,
+		Path:      target,
+		ErrorOk:   true,
 		Check: func(resp *logical.Response) error {
 			if expectErr {
 				return checkErrResponse(resp)
@@ -96,7 +96,7 @@ func testAccReadDbConfig(t *testing.T, name string, expect map[string]interface{
 			if expectKeys != nil {
 				for _, k := range expectKeys {
 					if _, ok := resp.Data[k]; !ok {
-						return fmt.Errorf("expected key %q to be present in response", k)
+						return fmt.Errorf("expected key %q to be present in response %+v", k, resp.Data)
 					}
 				}
 			}
@@ -105,7 +105,7 @@ func testAccReadDbConfig(t *testing.T, name string, expect map[string]interface{
 				for k, ev := range expect {
 					pv, ok := resp.Data[k]
 					if !ok {
-						return fmt.Errorf("expected key %q to be present in response", k)
+						return fmt.Errorf("expected mapping %q to be present in response %+v", k, resp.Data)
 					}
 
 					if !reflect.DeepEqual(ev, pv) {

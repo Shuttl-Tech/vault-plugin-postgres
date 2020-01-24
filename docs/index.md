@@ -25,6 +25,15 @@ you may or may not be able to access certain paths.
     ^creds/(?P<cluster>\w(([\w-.]+)?\w)?)/(?P<database>\w(([\w-.]+)?\w)?)/(?P<role>\w(([\w-.]+)?\w)?)$
         Generate temporary credential pair against a role and database.
 
+    ^gc/cluster/(?P<cluster>\w(([\w-.]+)?\w)?)$
+        Read, list and purge a cluster configuration
+
+    ^gc/cluster/(?P<cluster>\w(([\w-.]+)?\w)?)/(?P<database>\w(([\w-.]+)?\w)?)$
+        Read and delete database configuration from a cluster
+
+    ^gc/clusters$
+        List all clusters that are deleted and ready for GC
+
     ^info$
         Returns the build information about the plugin.
 
@@ -47,6 +56,7 @@ you may or may not be able to access certain paths.
  - [cluster](./cluster.md)
  - [creds](./creds.md)
  - [database](./database.md)
+ - [gc](./gc.md)
  - [index](./index.md)
  - [info](./info.md)
  - [metadata](./metadata.md)

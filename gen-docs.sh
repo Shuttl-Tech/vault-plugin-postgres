@@ -21,6 +21,11 @@ echo -e "\n---\n"                                            >> docs/roles.md
 vault path-help pg-cluster/roles                | fmt_header >> docs/roles.md
 vault path-help pg-cluster/creds/c/d/r          | fmt_header > docs/creds.md
 vault path-help pg-cluster/metadata             | fmt_header > docs/metadata.md
+vault path-help pg-cluster/gc/clusters          | fmt_header > docs/gc.md
+echo -e "\n---\n"                                            >> docs/gc.md
+vault path-help pg-cluster/gc/cluster/c         | fmt_header >> docs/gc.md
+echo -e "\n---\n"                                            >> docs/gc.md
+vault path-help pg-cluster/gc/cluster/c/d       | fmt_header >> docs/gc.md
 
 declare -a toc
 

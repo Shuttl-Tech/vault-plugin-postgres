@@ -322,6 +322,49 @@ func New(c *logical.BackendConfig) *backend {
 				HelpSynopsis:    helpSynopsisCreds,
 				HelpDescription: helpDescriptionCreds,
 			},
+			{
+				Pattern: "gc/clusters",
+				Callbacks: map[logical.Operation]framework.OperationFunc{
+					logical.ListOperation: b.gcListClusters,
+				},
+				HelpSynopsis:    helpSynopsisGCListClusters,
+				HelpDescription: helpDescriptionGCListClusters,
+			},
+			{
+				Pattern: "gc/cluster/" + framework.GenericNameRegex("cluster"),
+				Fields: map[string]*framework.FieldSchema{
+					"cluster": {
+						Type:        framework.TypeString,
+						Description: "Name of the database cluster",
+					},
+				},
+				Callbacks: map[logical.Operation]framework.OperationFunc{
+					logical.ListOperation:   b.gcListDatabases,
+					logical.ReadOperation:   b.gcGetCluster,
+					logical.DeleteOperation: b.gcPurgeCluster,
+				},
+				HelpSynopsis:    helpSynopsisGCClusterOps,
+				HelpDescription: helpDescriptionGCClusterOps,
+			},
+			{
+				Pattern: "gc/cluster/" + framework.GenericNameRegex("cluster") + "/" + framework.GenericNameRegex("database"),
+				Fields: map[string]*framework.FieldSchema{
+					"cluster": {
+						Type:        framework.TypeString,
+						Description: "Name of the database cluster",
+					},
+					"database": {
+						Type:        framework.TypeString,
+						Description: "Name of the database",
+					},
+				},
+				Callbacks: map[logical.Operation]framework.OperationFunc{
+					logical.ReadOperation:   b.gcGetDatabase,
+					logical.DeleteOperation: b.gcPurgeDatabase,
+				},
+				HelpSynopsis:    helpSynopsisGCDbOps,
+				HelpDescription: helpDescriptionGCDbOps,
+			},
 		},
 		Help: helpDescriptionBackend,
 	}

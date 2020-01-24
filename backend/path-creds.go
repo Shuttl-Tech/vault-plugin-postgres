@@ -3,13 +3,14 @@ package backend
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/vault/helper/dbtxn"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 	"github.com/lib/pq"
-	"strings"
-	"time"
 )
 
 var defaultCreationSQL = []string{
