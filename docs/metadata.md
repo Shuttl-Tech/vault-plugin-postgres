@@ -47,6 +47,7 @@ Listing metadata endpoint returns a map from object identifier to map of key-val
  - [cluster](./cluster.md)
  - [creds](./creds.md)
  - [database](./database.md)
+ - [gc](./gc.md)
  - [index](./index.md)
  - [info](./info.md)
  - [metadata](./metadata.md)

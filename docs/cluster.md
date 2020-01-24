@@ -77,6 +77,7 @@ registered in the cluster so far.
  - [cluster](./cluster.md)
  - [creds](./creds.md)
  - [database](./database.md)
+ - [gc](./gc.md)
  - [index](./index.md)
  - [info](./info.md)
  - [metadata](./metadata.md)

@@ -59,7 +59,7 @@ func TestBackend_cluster_list(t *testing.T) {
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/test-acc-cluster-one", attr1, false),
 			testAccWriteClusterConfig(t, "cluster/test-acc-cluster-two", attr2, false),
-			testAccListClusters(t, "test-acc-cluster-one", "test-acc-cluster-two"),
+			testAccListClusters(t, "cluster/", "test-acc-cluster-one", "test-acc-cluster-two"),
 		},
 	})
 }
@@ -211,10 +211,10 @@ func testAccDeleteClusterConfig(t *testing.T, target string, expectError bool) l
 	}
 }
 
-func testAccListClusters(t *testing.T, clusters ...string) logicaltest.TestStep {
+func testAccListClusters(t *testing.T, target string, clusters ...string) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.ListOperation,
-		Path:      "cluster/",
+		Path:      target,
 		ErrorOk:   false,
 		Check: func(resp *logical.Response) error {
 			keys, ok := resp.Data["keys"]

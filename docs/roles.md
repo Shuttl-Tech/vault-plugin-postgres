@@ -49,6 +49,7 @@ List the names of all registered roles
  - [cluster](./cluster.md)
  - [creds](./creds.md)
  - [database](./database.md)
+ - [gc](./gc.md)
  - [index](./index.md)
  - [info](./info.md)
  - [metadata](./metadata.md)
