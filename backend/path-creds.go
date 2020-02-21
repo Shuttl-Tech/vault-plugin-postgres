@@ -94,6 +94,9 @@ func (b *backend) secretCredsCreate(ctx context.Context, req *logical.Request, d
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		_ = db.Close()
+	}()
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -212,6 +215,9 @@ func (b *backend) secretCredsRenew(ctx context.Context, req *logical.Request, da
 		if err != nil {
 			return nil, err
 		}
+		defer func() {
+			_ = db.Close()
+		}()
 
 		err = dbtxn.ExecuteDBQuery(ctx, db, m, queryRenewExpiry)
 		if err != nil {
@@ -295,6 +301,9 @@ func (b *backend) secretCredsRevoke(ctx context.Context, req *logical.Request, d
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		_ = db.Close()
+	}()
 
 	tx, err := db.Begin()
 	if err != nil {
