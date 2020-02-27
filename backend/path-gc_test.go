@@ -1,7 +1,7 @@
 package backend
 
 import (
-	logicaltest "github.com/hashicorp/vault/logical/testing"
+	logicaltest "github.com/hashicorp/vault/helper/testhelpers/logical"
 	_ "github.com/lib/pq"
 	"testing"
 )
@@ -20,7 +20,7 @@ func TestAccGCListClusters(t *testing.T) {
 	}
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			// Create two clusters
 			testAccWriteClusterConfig(t, "cluster/test-cluster-one", attr1, false),
@@ -57,7 +57,7 @@ func TestAccGCGetCluster(t *testing.T) {
 	}
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			// Create two clusters
 			testAccWriteClusterConfig(t, "cluster/test-cluster-one", attr1, false),
@@ -81,7 +81,7 @@ func TestAccGcListDatabases(t *testing.T) {
 	defer cleanup()
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			// Create a cluster
 			testAccWriteClusterConfig(t, "cluster/test-cluster-one", attr, false),
@@ -117,7 +117,7 @@ func TestAccGcGetDatabase(t *testing.T) {
 	}
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			// Create a cluster
 			testAccWriteClusterConfig(t, "cluster/test-cluster-one", attr, false),
@@ -160,7 +160,7 @@ func TestGcPurgeDatabase(t *testing.T) {
 	}
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			// Create a cluster
 			testAccWriteClusterConfig(t, "cluster/test-cluster-one", attr, false),
@@ -221,7 +221,7 @@ func TestGcPurgeCluster(t *testing.T) {
 	}
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			// Create two clusters
 			testAccWriteClusterConfig(t, "cluster/test-cluster-one", attr1, false),

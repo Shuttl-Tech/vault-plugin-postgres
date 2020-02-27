@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/hashicorp/vault/logical"
-	"github.com/hashicorp/vault/logical/framework"
+	"github.com/hashicorp/vault/sdk/framework"
+	"github.com/hashicorp/vault/sdk/logical"
 	"time"
 )
 
@@ -76,8 +76,8 @@ func New(c *logical.BackendConfig) *backend {
 		Paths: []*framework.Path{
 			{
 				Pattern: "info",
-				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.ReadOperation: b.pathInfo,
+				Operations: map[logical.Operation]framework.OperationHandler{
+					logical.ReadOperation: NewOperationHandler(b.pathInfo, propsPathInfo),
 				},
 				HelpSynopsis:    helpSynopsisInfo,
 				HelpDescription: helpDescriptionInfo,
@@ -102,10 +102,10 @@ func New(c *logical.BackendConfig) *backend {
 						Description: "key-value pairs to associate with the object",
 					},
 				},
-				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.UpdateOperation: b.pathMetadataUpdate,
-					logical.ReadOperation:   b.pathMetadataRead,
-					logical.ListOperation:   b.pathMetadataList,
+				Operations: map[logical.Operation]framework.OperationHandler{
+					logical.UpdateOperation: NewOperationHandler(b.pathMetadataUpdate, propsMetadataUpdate),
+					logical.ReadOperation:   NewOperationHandler(b.pathMetadataRead, propsMetadataRead),
+					logical.ListOperation:   NewOperationHandler(b.pathMetadataList, propsMetadataList),
 				},
 				HelpSynopsis:    helpSynopsisMetadata,
 				HelpDescription: helpDescriptionMetadata,
@@ -118,15 +118,15 @@ func New(c *logical.BackendConfig) *backend {
 						Description: "Metadata ID",
 					},
 				},
-				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.DeleteOperation: b.pathMetadataDelete,
+				Operations: map[logical.Operation]framework.OperationHandler{
+					logical.DeleteOperation: NewOperationHandler(b.pathMetadataDelete, propsMetadataDelete),
 				},
 				HelpSynopsis: "Delete metadata using ID",
 			},
 			{
 				Pattern: "cluster/?$",
-				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.ListOperation: b.pathClustersList,
+				Operations: map[logical.Operation]framework.OperationHandler{
+					logical.ListOperation: NewOperationHandler(b.pathClustersList, propsClustersList),
 				},
 				HelpSynopsis:    helpSynopsisListClusters,
 				HelpDescription: helpDescriptionListClusters,
@@ -181,11 +181,11 @@ func New(c *logical.BackendConfig) *backend {
 						Default:     "require",
 					},
 				},
-				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.ReadOperation:   b.pathClusterRead,
-					logical.UpdateOperation: b.pathClusterUpdate,
-					logical.DeleteOperation: b.pathClusterDelete,
-					logical.ListOperation:   b.pathDatabasesList,
+				Operations: map[logical.Operation]framework.OperationHandler{
+					logical.ReadOperation:   NewOperationHandler(b.pathClusterRead, propsClusterRead),
+					logical.UpdateOperation: NewOperationHandler(b.pathClusterUpdate, propsClusterUpdate),
+					logical.DeleteOperation: NewOperationHandler(b.pathClusterDelete, propsClusterDelete),
+					logical.ListOperation:   NewOperationHandler(b.pathDatabasesList, propsDatabasesList),
 				},
 				HelpSynopsis:    helpSynopsisCluster,
 				HelpDescription: helpDescriptionCluster,
@@ -216,8 +216,8 @@ func New(c *logical.BackendConfig) *backend {
 						Description: "If set to true the clone will inherit the configuration for deleted databases as well",
 					},
 				},
-				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.UpdateOperation: b.pathCloneUpdate,
+				Operations: map[logical.Operation]framework.OperationHandler{
+					logical.UpdateOperation: NewOperationHandler(b.pathCloneUpdate, propsCloneUpdate),
 				},
 				HelpSynopsis:    helpSynopsisClone,
 				HelpDescription: helpDescriptionClone,
@@ -248,18 +248,18 @@ func New(c *logical.BackendConfig) *backend {
 						Default:     true,
 					},
 				},
-				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.UpdateOperation: b.pathDatabaseUpdate,
-					logical.ReadOperation:   b.pathDatabaseRead,
-					logical.DeleteOperation: b.pathDatabaseDelete,
+				Operations: map[logical.Operation]framework.OperationHandler{
+					logical.UpdateOperation: NewOperationHandler(b.pathDatabaseUpdate, propsDatabaseUpdate),
+					logical.ReadOperation:   NewOperationHandler(b.pathDatabaseRead, propsDatabaseRead),
+					logical.DeleteOperation: NewOperationHandler(b.pathDatabaseDelete, propsDatabaseDelete),
 				},
 				HelpSynopsis:    helpSynopsisDatabase,
 				HelpDescription: helpDescriptionDatabase,
 			},
 			{
 				Pattern: "roles/?$",
-				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.ListOperation: b.pathRoleList,
+				Operations: map[logical.Operation]framework.OperationHandler{
+					logical.ListOperation: NewOperationHandler(b.pathRoleList, propsRoleList),
 				},
 				HelpSynopsis:    helpSynopsisListRoles,
 				HelpDescription: helpDescriptionListRoles,
@@ -292,10 +292,10 @@ func New(c *logical.BackendConfig) *backend {
 						Default:     defaultRevocationSQL,
 					},
 				},
-				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.UpdateOperation: b.pathRoleUpdate,
-					logical.ReadOperation:   b.pathRoleRead,
-					logical.DeleteOperation: b.pathRoleDelete,
+				Operations: map[logical.Operation]framework.OperationHandler{
+					logical.UpdateOperation: NewOperationHandler(b.pathRoleUpdate, propsRoleUpdate),
+					logical.ReadOperation:   NewOperationHandler(b.pathRoleRead, propsRoleRead),
+					logical.DeleteOperation: NewOperationHandler(b.pathRoleDelete, propsRoleDelete),
 				},
 				HelpSynopsis:    helpSynopsisRoles,
 				HelpDescription: helpDescriptionRoles,
@@ -316,16 +316,16 @@ func New(c *logical.BackendConfig) *backend {
 						Description: "Name of the role",
 					},
 				},
-				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.ReadOperation: b.secretCredsCreate,
+				Operations: map[logical.Operation]framework.OperationHandler{
+					logical.ReadOperation: NewOperationHandler(b.secretCredsCreate, propsCredsRead),
 				},
 				HelpSynopsis:    helpSynopsisCreds,
 				HelpDescription: helpDescriptionCreds,
 			},
 			{
 				Pattern: "gc/clusters",
-				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.ListOperation: b.gcListClusters,
+				Operations: map[logical.Operation]framework.OperationHandler{
+					logical.ListOperation: NewOperationHandler(b.gcListClusters, propsGcListClusters),
 				},
 				HelpSynopsis:    helpSynopsisGCListClusters,
 				HelpDescription: helpDescriptionGCListClusters,
@@ -338,10 +338,10 @@ func New(c *logical.BackendConfig) *backend {
 						Description: "Name of the database cluster",
 					},
 				},
-				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.ListOperation:   b.gcListDatabases,
-					logical.ReadOperation:   b.gcGetCluster,
-					logical.DeleteOperation: b.gcPurgeCluster,
+				Operations: map[logical.Operation]framework.OperationHandler{
+					logical.ListOperation:   NewOperationHandler(b.gcListDatabases, propsListDatabases),
+					logical.ReadOperation:   NewOperationHandler(b.gcGetCluster, propsGcGetCluster),
+					logical.DeleteOperation: NewOperationHandler(b.gcPurgeCluster, propsGcPurgeCluster),
 				},
 				HelpSynopsis:    helpSynopsisGCClusterOps,
 				HelpDescription: helpDescriptionGCClusterOps,
@@ -358,9 +358,9 @@ func New(c *logical.BackendConfig) *backend {
 						Description: "Name of the database",
 					},
 				},
-				Callbacks: map[logical.Operation]framework.OperationFunc{
-					logical.ReadOperation:   b.gcGetDatabase,
-					logical.DeleteOperation: b.gcPurgeDatabase,
+				Operations: map[logical.Operation]framework.OperationHandler{
+					logical.ReadOperation:   NewOperationHandler(b.gcGetDatabase, propsGcGetDatabase),
+					logical.DeleteOperation: NewOperationHandler(b.gcPurgeDatabase, propsGcPurgeDatabase),
 				},
 				HelpSynopsis:    helpSynopsisGCDbOps,
 				HelpDescription: helpDescriptionGCDbOps,

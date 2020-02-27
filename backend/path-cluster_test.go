@@ -3,8 +3,8 @@ package backend
 import (
 	"database/sql"
 	"fmt"
-	"github.com/hashicorp/vault/logical"
-	logicaltest "github.com/hashicorp/vault/logical/testing"
+	logicaltest "github.com/hashicorp/vault/helper/testhelpers/logical"
+	"github.com/hashicorp/vault/sdk/logical"
 	_ "github.com/lib/pq"
 	"github.com/mitchellh/mapstructure"
 	"reflect"
@@ -29,7 +29,7 @@ func TestBackend_cluster_basic(t *testing.T) {
 	}
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/test-acc-cluster", attr, false),
 			testAccReadClusterConfig(t, "cluster/test-acc-cluster", expectAttr, expectKeys, false),
@@ -55,7 +55,7 @@ func TestBackend_cluster_list(t *testing.T) {
 	defer cleanup2()
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/test-acc-cluster-one", attr1, false),
 			testAccWriteClusterConfig(t, "cluster/test-acc-cluster-two", attr2, false),
@@ -70,7 +70,7 @@ func TestBackend_cluster_init(t *testing.T) {
 	defer cleanup()
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/test-acc-init", attr, false),
 			testAccValidateClusterInit(t, "cluster/test-acc-init"),

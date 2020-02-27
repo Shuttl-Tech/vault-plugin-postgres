@@ -3,8 +3,8 @@ package backend
 import (
 	"context"
 	"github.com/Shuttl-Tech/vault-plugin-postgres/version"
-	"github.com/hashicorp/vault/logical"
-	"github.com/hashicorp/vault/logical/framework"
+	"github.com/hashicorp/vault/sdk/framework"
+	"github.com/hashicorp/vault/sdk/logical"
 )
 
 func (b *backend) pathInfo(context.Context, *logical.Request, *framework.FieldData) (*logical.Response, error) {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/hashicorp/vault/logical"
-	logicaltest "github.com/hashicorp/vault/logical/testing"
+	logicaltest "github.com/hashicorp/vault/helper/testhelpers/logical"
+	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/mitchellh/mapstructure"
 	"path"
 	"strings"
@@ -68,7 +68,7 @@ func TestAccCredsCreate(t *testing.T) {
 	// the data in storage
 	hijackT := &T{T: t}
 	logicaltest.Test(hijackT, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, path.Join("cluster", testCluster), clusterAttr, false),
 			testAccReadClusterConfigCallback(t, path.Join("cluster", testCluster), cb),
