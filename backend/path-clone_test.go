@@ -1,8 +1,8 @@
 package backend
 
 import (
-	"github.com/hashicorp/vault/logical"
-	logicaltest "github.com/hashicorp/vault/logical/testing"
+	logicaltest "github.com/hashicorp/vault/helper/testhelpers/logical"
+	"github.com/hashicorp/vault/sdk/logical"
 	"testing"
 )
 
@@ -18,7 +18,7 @@ func TestCloneUpdate(t *testing.T) {
 	)
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/"+testCloneSourceCluster, attrs, false),
 			testAccWriteDbConfig(t, "cluster/"+testCloneSourceCluster+"/"+testCloneDb),

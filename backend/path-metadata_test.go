@@ -2,8 +2,8 @@ package backend
 
 import (
 	"fmt"
-	"github.com/hashicorp/vault/logical"
-	logicaltest "github.com/hashicorp/vault/logical/testing"
+	logicaltest "github.com/hashicorp/vault/helper/testhelpers/logical"
+	"github.com/hashicorp/vault/sdk/logical"
 	"reflect"
 	"sort"
 	"testing"
@@ -50,7 +50,7 @@ func TestMetadata_basic(t *testing.T) {
 	}
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/test-acc-cluster", attr, false),
 			testAccWriteDbConfig(t, "cluster/test-acc-cluster/test-db"),

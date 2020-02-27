@@ -2,8 +2,8 @@ package backend
 
 import (
 	"fmt"
-	"github.com/hashicorp/vault/logical"
-	logicaltest "github.com/hashicorp/vault/logical/testing"
+	logicaltest "github.com/hashicorp/vault/helper/testhelpers/logical"
+	"github.com/hashicorp/vault/sdk/logical"
 	"reflect"
 	"testing"
 )
@@ -18,7 +18,7 @@ func TestAccRole_basic(t *testing.T) {
 	}
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteRoleConfig(t, "roles/test-acc", roleAttr, false),
 			testAccWriteRoleConfig(t, "roles/test-acc-one", roleAttr, false),

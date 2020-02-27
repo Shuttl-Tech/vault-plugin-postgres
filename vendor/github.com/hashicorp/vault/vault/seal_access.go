@@ -1,6 +1,8 @@
 package vault
 
-import "context"
+import (
+	"context"
+)
 
 // SealAccess is a wrapper around Seal that exposes accessor methods
 // through Core.SealAccess() while restricting the ability to modify
@@ -13,8 +15,12 @@ func NewSealAccess(seal Seal) *SealAccess {
 	return &SealAccess{seal: seal}
 }
 
-func (s *SealAccess) StoredKeysSupported() bool {
+func (s *SealAccess) StoredKeysSupported() StoredKeysSupport {
 	return s.seal.StoredKeysSupported()
+}
+
+func (s *SealAccess) BarrierType() string {
+	return s.seal.BarrierType()
 }
 
 func (s *SealAccess) BarrierConfig(ctx context.Context) (*SealConfig, error) {

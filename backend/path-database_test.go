@@ -3,8 +3,8 @@ package backend
 import (
 	"database/sql"
 	"fmt"
-	"github.com/hashicorp/vault/logical"
-	logicaltest "github.com/hashicorp/vault/logical/testing"
+	logicaltest "github.com/hashicorp/vault/helper/testhelpers/logical"
+	"github.com/hashicorp/vault/sdk/logical"
 	_ "github.com/lib/pq"
 	"github.com/mitchellh/mapstructure"
 	"reflect"
@@ -26,7 +26,7 @@ func TestAccDatabaseCreate_basic(t *testing.T) {
 	expectKeys := []string{"objects_owner"}
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/test-acc-db", attr, false),
 			testAccWriteDbConfig(t, "cluster/test-acc-db/test-db"),
@@ -45,7 +45,7 @@ func TestAccDatabasesList(t *testing.T) {
 	defer cleanup()
 
 	logicaltest.Test(t, logicaltest.TestCase{
-		Backend: backend,
+		LogicalBackend: backend,
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/test-acc-db", attr, false),
 			testAccWriteDbConfig(t, "cluster/test-acc-db/test-db-one"),
