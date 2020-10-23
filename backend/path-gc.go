@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
+	"net/http"
 	"strings"
 )
 
@@ -106,13 +107,38 @@ func (b *backend) gcPurgeCluster(ctx context.Context, req *logical.Request, data
 		return logical.ErrorResponse(fmt.Sprintf("Cluster %s is not marked for GC. Delete the cluster using cluster/:name endpoint before invoking GC operation on it", cn)), nil
 	}
 
+	// Also purge cluster's databases
+	databases, err := req.Storage.List(ctx, PathDatabase.For(cn, ""))
+	if err != nil {
+		return nil, err
+	}
+
+	for _, dbname := range databases {
+		db, err := loadDbEntry(ctx, req.Storage, cn, dbname)
+		if err != nil {
+			return nil, err
+		}
+
+		if !db.IsDisabled() {
+			return logical.ErrorResponse(fmt.Sprintf("Database %s is not marked for GC.", dbname)), nil
+		}
+
+		err = req.Storage.Delete(ctx, PathDatabase.For(cn, dbname))
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	err = req.Storage.Delete(ctx, PathCluster.For(cn))
 	if err != nil {
 		return nil, err
 	}
 
 	return &logical.Response{
-		Data: map[string]interface{}{},
+		Data: map[string]interface{}{
+			logical.HTTPContentType: "application/json",
+			logical.HTTPStatusCode:  http.StatusOK,
+		},
 	}, nil
 }
 
