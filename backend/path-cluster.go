@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/vault/sdk/helper/dbtxn"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/lib/pq"
+	"strings"
 )
 
 type ClusterConfig struct {
@@ -309,7 +310,18 @@ func (b *backend) pathClustersList(ctx context.Context, req *logical.Request, da
 		return nil, err
 	}
 
-	return logical.ListResponse(entries), nil
+	var results []string
+	for _, clusterName := range entries {
+		isDatabasePath := strings.HasSuffix(clusterName, "/")
+		if isDatabasePath {
+			// Not an actual cluster path, path belongs to databases inside cluster
+			continue
+		}
+
+		results = append(results, clusterName)
+	}
+
+	return logical.ListResponse(results), nil
 }
 
 func (b *backend) makeConn(dsn string) (*sql.DB, error) {

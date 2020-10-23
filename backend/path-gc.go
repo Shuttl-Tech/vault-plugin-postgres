@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
+	"strings"
 )
 
 func listDisabledClusters(ctx context.Context, storage logical.Storage) ([]string, error) {
@@ -15,6 +16,12 @@ func listDisabledClusters(ctx context.Context, storage logical.Storage) ([]strin
 
 	var results []string
 	for _, c := range clusters {
+		isDatabasePath := strings.HasSuffix(c, "/")
+		if isDatabasePath {
+			// Not an actual cluster path, path belongs to databases inside cluster
+			continue
+		}
+
 		cluster, err := loadClusterEntry(ctx, storage, c)
 		if err != nil {
 			return nil, err
