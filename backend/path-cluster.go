@@ -288,6 +288,30 @@ func (b *backend) pathClusterDelete(ctx context.Context, req *logical.Request, d
 		return logical.ErrorResponse(fmt.Sprintf("Cluster %s is deleted. Use gc/cluster to manage deleted clusters", clusterName)), nil
 	}
 
+	// Mark all databases within cluster as disabled
+	databases, err := req.Storage.List(ctx, PathDatabase.For(clusterName, ""))
+	if err != nil {
+		return nil, err
+	}
+
+	for _, dbName := range databases {
+		db, err := loadDbEntry(ctx, req.Storage, clusterName, dbName)
+		if err != nil {
+			return nil, err
+		}
+
+		if db.IsDisabled() {
+			continue
+		}
+
+		db.Disable()
+
+		err = storeDbEntry(ctx, req.Storage, clusterName, dbName, db)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	c.Disable()
 
 	err = storeClusterEntry(ctx, req.Storage, clusterName, c)
