@@ -318,6 +318,16 @@ func (b *backend) pathClustersList(ctx context.Context, req *logical.Request, da
 			continue
 		}
 
+		cluster, err := loadClusterEntry(ctx, req.Storage, clusterName)
+		if err != nil {
+			return nil, err
+		}
+
+		// Skipped the deleted cluster from list
+		if cluster.IsDisabled() {
+			continue
+		}
+
 		results = append(results, clusterName)
 	}
 
