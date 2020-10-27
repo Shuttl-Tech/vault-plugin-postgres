@@ -50,7 +50,12 @@ func TestAccDatabasesList(t *testing.T) {
 			testAccWriteClusterConfig(t, "cluster/test-acc-db", attr, false),
 			testAccWriteDbConfig(t, "cluster/test-acc-db/test-db-one"),
 			testAccWriteDbConfig(t, "cluster/test-acc-db/test-db-two"),
-			testAccListDatabases(t, "cluster/test-acc-db", "test-db-one", "test-db-two"),
+			testAccWriteDbConfig(t, "cluster/test-acc-db/test-db-three"),
+
+			// Delete database
+			testAccDeleteDbConfig(t, "cluster/test-acc-db/test-db-two"),
+
+			testAccListDatabases(t, "cluster/test-acc-db", "test-db-one", "test-db-three"),
 		},
 	})
 }
