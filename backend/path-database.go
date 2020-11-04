@@ -294,5 +294,20 @@ func (b *backend) pathDatabasesList(ctx context.Context, req *logical.Request, d
 		return nil, err
 	}
 
-	return logical.ListResponse(entries), nil
+	var results []string
+	for _, dbname := range entries {
+		db, err := loadDbEntry(ctx, req.Storage, cluster, dbname)
+		if err != nil {
+			return nil, err
+		}
+
+		// Skipped the deleted database from list
+		if db.IsDisabled() {
+			continue
+		}
+
+		results = append(results, dbname)
+	}
+
+	return logical.ListResponse(results), nil
 }

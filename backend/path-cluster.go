@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/vault/sdk/helper/dbtxn"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/lib/pq"
+	"strings"
 )
 
 type ClusterConfig struct {
@@ -287,6 +288,30 @@ func (b *backend) pathClusterDelete(ctx context.Context, req *logical.Request, d
 		return logical.ErrorResponse(fmt.Sprintf("Cluster %s is deleted. Use gc/cluster to manage deleted clusters", clusterName)), nil
 	}
 
+	// Mark all databases within cluster as disabled
+	databases, err := req.Storage.List(ctx, PathDatabase.For(clusterName, ""))
+	if err != nil {
+		return nil, err
+	}
+
+	for _, dbName := range databases {
+		db, err := loadDbEntry(ctx, req.Storage, clusterName, dbName)
+		if err != nil {
+			return nil, err
+		}
+
+		if db.IsDisabled() {
+			continue
+		}
+
+		db.Disable()
+
+		err = storeDbEntry(ctx, req.Storage, clusterName, dbName, db)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	c.Disable()
 
 	err = storeClusterEntry(ctx, req.Storage, clusterName, c)
@@ -309,7 +334,28 @@ func (b *backend) pathClustersList(ctx context.Context, req *logical.Request, da
 		return nil, err
 	}
 
-	return logical.ListResponse(entries), nil
+	var results []string
+	for _, clusterName := range entries {
+		isDatabasePath := strings.HasSuffix(clusterName, "/")
+		if isDatabasePath {
+			// Not an actual cluster path, path belongs to databases inside cluster
+			continue
+		}
+
+		cluster, err := loadClusterEntry(ctx, req.Storage, clusterName)
+		if err != nil {
+			return nil, err
+		}
+
+		// Skipped the deleted cluster from list
+		if cluster.IsDisabled() {
+			continue
+		}
+
+		results = append(results, clusterName)
+	}
+
+	return logical.ListResponse(results), nil
 }
 
 func (b *backend) makeConn(dsn string) (*sql.DB, error) {

@@ -323,7 +323,7 @@ func New(c *logical.BackendConfig) *backend {
 				HelpDescription: helpDescriptionCreds,
 			},
 			{
-				Pattern: "gc/clusters",
+				Pattern: "gc/clusters/?$",
 				Operations: map[logical.Operation]framework.OperationHandler{
 					logical.ListOperation: NewOperationHandler(b.gcListClusters, propsGcListClusters),
 				},
@@ -331,7 +331,7 @@ func New(c *logical.BackendConfig) *backend {
 				HelpDescription: helpDescriptionGCListClusters,
 			},
 			{
-				Pattern: "gc/cluster/" + framework.GenericNameRegex("cluster"),
+				Pattern: "gc/cluster/" + framework.GenericNameRegex("cluster") + "/?$",
 				Fields: map[string]*framework.FieldSchema{
 					"cluster": {
 						Type:        framework.TypeString,

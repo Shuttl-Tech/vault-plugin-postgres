@@ -32,7 +32,7 @@ using role provided creation statements but keep in mind that if the ownership
 is not transferred and re-assigned properly then the temporary users will not be
 able to use objects created by each other.
 
-This endpoint can not be used to read a delete4d database configuration 
+This endpoint can not be used to read a deleted database configuration 
 or a database that exists in deleted cluster.
 
 Deleting a database does not drop the actual resource. Vault still retains the

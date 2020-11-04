@@ -59,6 +59,11 @@ func TestBackend_cluster_list(t *testing.T) {
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/test-acc-cluster-one", attr1, false),
 			testAccWriteClusterConfig(t, "cluster/test-acc-cluster-two", attr2, false),
+
+			// Create databases in cluster
+			testAccWriteDbConfig(t, "cluster/test-acc-cluster-one/test-db"),
+			testAccWriteDbConfig(t, "cluster/test-acc-cluster-two/test-db"),
+
 			testAccListClusters(t, "cluster/", "test-acc-cluster-one", "test-acc-cluster-two"),
 		},
 	})
@@ -74,6 +79,28 @@ func TestBackend_cluster_init(t *testing.T) {
 		Steps: []logicaltest.TestStep{
 			testAccWriteClusterConfig(t, "cluster/test-acc-init", attr, false),
 			testAccValidateClusterInit(t, "cluster/test-acc-init"),
+		},
+	})
+}
+
+func TestBackend_DeleteCluster_Should_DeleteDatabase(t *testing.T) {
+	backend := testGetBackend(t)
+	cleanup1, attr1 := prepareTestContainer(t)
+	defer cleanup1()
+
+	logicaltest.Test(t, logicaltest.TestCase{
+		LogicalBackend: backend,
+		Steps: []logicaltest.TestStep{
+			testAccWriteClusterConfig(t, "cluster/test-acc-cluster-one", attr1, false),
+
+			// Create databases in cluster
+			testAccWriteDbConfig(t, "cluster/test-acc-cluster-one/test-db-one"),
+			testAccWriteDbConfig(t, "cluster/test-acc-cluster-one/test-db-two"),
+			testAccListDatabases(t, "cluster/test-acc-cluster-one", "test-db-one", "test-db-two"),
+
+			testAccDeleteClusterConfig(t, "cluster/test-acc-cluster-one", false),
+			testAccListDatabasesWithoutKeys(t, "cluster/test-acc-cluster-one"),
+			testAccListDatabases(t, "gc/cluster/test-acc-cluster-one", "test-db-one", "test-db-two"),
 		},
 	})
 }
@@ -224,6 +251,22 @@ func testAccListClusters(t *testing.T, target string, clusters ...string) logica
 
 			if !reflect.DeepEqual(clusters, keys) {
 				return fmt.Errorf("expected keys %+v, got %+v", clusters, keys)
+			}
+
+			return nil
+		},
+	}
+}
+
+func testAccListDatabasesWithoutKeys(t *testing.T, target string) logicaltest.TestStep {
+	return logicaltest.TestStep{
+		Operation: logical.ListOperation,
+		Path:      target,
+		ErrorOk:   false,
+		Check: func(resp *logical.Response) error {
+			_, ok := resp.Data["keys"]
+			if ok {
+				return fmt.Errorf("not expected keys attributes to exist in response")
 			}
 
 			return nil

@@ -26,6 +26,9 @@ func TestAccGCListClusters(t *testing.T) {
 			testAccWriteClusterConfig(t, "cluster/test-cluster-one", attr1, false),
 			testAccWriteClusterConfig(t, "cluster/test-cluster-two", attr2, false),
 
+			// Create database in cluster
+			testAccWriteDbConfig(t, "cluster/test-cluster-one/test-db"),
+
 			// Delete one cluster
 			testAccDeleteClusterConfig(t, "cluster/test-cluster-one", false),
 
@@ -238,8 +241,14 @@ func TestGcPurgeCluster(t *testing.T) {
 			// Delete cluster one
 			testAccDeleteClusterConfig(t, "cluster/test-cluster-one", false),
 
+			// Assert that databases are marked for GC after delete cluster
+			testAccListDatabases(t, "gc/cluster/test-cluster-one", "test-db-one", "test-db-three", "test-db-two"),
+
 			// Purge deleted cluster
 			testAccDeleteClusterConfig(t, "gc/cluster/test-cluster-one", false),
+
+			// Assert that databases are purged after purge cluster
+			testAccListDatabasesWithoutKeys(t, "gc/cluster/test-cluster-one"),
 
 			// Assert that the purged cluster is no longer available
 			testAccReadClusterConfig(t, "gc/cluster/test-cluster-one", nil, nil, true),

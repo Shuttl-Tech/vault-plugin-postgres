@@ -1,14 +1,12 @@
     Request:        cluster
     Matching Route: ^cluster/?$
 
-List the names of all clusters that have been registered so far
+List the names of all active clusters that have been registered so far
 
 
 ## DESCRIPTION
 
-List clusters path returns a list of all registered clusters, active or
-disabled. Note that the list contains no information about whether the cluster
-is active or not.
+List clusters path returns a list of all active clusters.
 
 ---
 
@@ -67,7 +65,7 @@ immediately disables all existing databases.
 It will not be possible to renew the lease on a disabled cluster and any active
 lease will be revoked on expiry.
 
-Listing this endpoint lists all active or deleted databases that have been
+Listing this endpoint lists all active databases that have been
 registered in the cluster so far.
 
 
